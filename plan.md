@@ -1,0 +1,157 @@
+# Refactoring Plan — Igniter CMS (UTM Part B: Code Smells & Refactoring)
+
+**Subject system:** Igniter CMS — a CodeIgniter 4 (PHP) open-source Content Management System.
+**Original author / source:** akassama — https://github.com/akassama/igniter-cms — Licence: **MIT**
+**Working repo (fork):** https://github.com/cangkulsand/igniter-cms — all analysis, SonarCloud, GitHub Actions, and refactoring run here (git remote `igniter-cms`).
+**Goal:** Identify code smells and apply Fowler refactorings **without changing external behaviour.**
+
+---
+
+## 0. Golden rule
+
+> **Capture the BEFORE baseline (scan + benchmark + tests) before touching a single line of app code.**
+> Without a frozen "before", there is no valid comparison for B5/B6.
+
+---
+
+## 1. Code smells under refactoring (from `CODE_SMELLS_REPORT.md`)
+
+| # | Smell | Location | Fowler refactoring (B4) | Detected by (B3) |
+|---|---|---|---|---|
+| #1 | God Class / Large Class | `app/Controllers/AdminController.php` (1,273 lines, **41 methods, 9 models, ~10 unrelated admin domains**) | **Extract Class** — split by domain into focused controllers | SonarCloud "too many methods/lines" + PHPMD `ExcessiveClassLength` / `TooManyMethods` |
+| #4 | Long Parameter List | `app/Helpers/cms_helper.php:1692` — `logActivity()` (8 params) | **Introduce Parameter Object** | SonarCloud "too many parameters" + PHPMD `ExcessiveParameterList` |
+| #3 | Duplicate Code | `cms_helper.php:3236` `renderSearchResults()` & `:3630` `renderFilterSearchResults()` (~400 lines each, near-identical) | **Extract Method** / Consolidate Duplicate Code | SonarCloud duplication % + jscpd / PHPCPD |
+| #5 | Data Clumps | `app/Controllers/AdminController.php` — `addUser()` & `updateUser()` (repeated user/social-link array) | **Introduce Parameter Object** (or Extract Method) | Manual review + SonarCloud duplication |
+
+> Minimum required: 2 distinct smells. We do 4 for depth.
+>
+> **Why `AdminController` for the God Class (not `cms_helper.php`)?** The smell is literally "God **Class**" — `AdminController` is a real class doing too much (41 methods across Users, API Keys, Configurations, Codes, Activity, Logs, Stats, IPs, Backups), whereas `cms_helper.php` is a procedural helper *file*. `AdminController` maps cleanly to **Extract Class**, is tractable (~1.3k lines vs 5.5k), and composes with #5 (the data clump lives inside it).
+>
+> **Behaviour-preservation note:** routes in `app/Config/Routes.php` are **explicitly defined** (not auto-routed). Extract Class = move methods into new controllers, then change only the controller name in each route line, keeping every **URL path identical** → external behaviour unchanged.
+
+---
+
+## 2. Tool stack
+
+| Purpose | Tool | Where it runs |
+|---|---|---|
+| Automated smell detection (primary) + metrics | **SonarCloud** (already linked to GitHub) | CI / cloud |
+| Cross-reference: long method/param/class, complexity, dead code | **PHPMD** | GitHub Actions |
+| Cross-reference: duplicate code | **jscpd** (and/or PHPCPD) | GitHub Actions |
+| Behaviour preservation — function level | **PHPUnit** (characterization / golden-master) | Local + CI |
+| Behaviour preservation — feature level + screenshots | **Katalon** (E2E, drives running app) | Local |
+| Execution time + memory | **Custom PHP micro-benchmark** (`hrtime()` + `memory_get_peak_usage()`) or PHPBench | Local (stable numbers) |
+| LOC + cyclomatic complexity + duplication | **SonarCloud** (and/or phploc) | CI |
+| Orchestration | **GitHub Actions** | CI |
+| *(optional)* endpoint response time | **JMeter** | Local |
+
+**Run-location rule:** deterministic metrics (LOC, complexity, duplication) come from SonarCloud/CI; timing benchmarks run **locally** on Laragon (CI runners are too noisy for time).
+
+---
+
+## 3. Task → deliverable → tool map (B1–B6)
+
+| Task | Deliverable | Tools |
+|---|---|---|
+| **B1** | 3–5 sentence system description + `/original-code` folder + source citation | git, GitHub |
+| **B2** | Smell table (✅ done in `CODE_SMELLS_REPORT.md`) | Manual review |
+| **B3** | Manual reasoning write-up + automated tool screenshots, cross-referenced | SonarCloud + PHPMD + jscpd |
+| **B4** | Per-smell: technique name + how it works + why it fits | Documentation only |
+| **B5** | Diffs + passing tests + running-app screenshots + `/refactored-code` + labelled commits | Katalon + PHPUnit + `php spark serve` + git diff + GitHub Actions |
+| **B6** *(bonus)* | Metrics table + profiler screenshots | SonarCloud (LOC/complexity/dup) + local benchmark (time/memory) + optional JMeter |
+
+---
+
+# ════════════ BEFORE (Baseline) ════════════
+
+**Objective:** freeze the original code and record its measurements + green tests. No app code changes in this phase.
+
+### Phase 0 — Setup (additive files only)
+- [x] Copy current untouched source into **`/original-code`** (+ README citing akassama/MIT).
+- [x] Add `sonar-project.properties` (excludes original-code/refactored-code from scan + CPD).
+- [x] Add `.github/workflows/analysis.yml` (SonarCloud + PHPMD + jscpd + PHPUnit; separate from FTP deploy).
+- [x] Add micro-benchmark harness as a spark command: `php spark benchmark:smells` (`app/Commands/BenchmarkSmells.php`) — time + memory. *(Used a spark command instead of a bare script so app helpers + DB are available.)*
+- [x] Exclude `original-code/**` + `refactored-code/**` from the FTP deploy (`main.yaml`).
+- [ ] **Push fork to GitHub** (`git push -u igniter-cms main`).
+- [ ] **Add `SONAR_TOKEN` repo secret** (GitHub → Settings → Secrets → Actions) so the SonarCloud job authenticates.
+
+### Phase 1 — Baseline measurements ("before")
+- [ ] **SonarCloud scan #1** on original code → record **LOC, cyclomatic complexity, duplication %** + screenshot dashboard. *(B3 + B6 "before")*
+- [ ] **PHPMD + jscpd** run → screenshots flagging #4, #3 (cross-reference). *(B3)*
+- [ ] **Micro-benchmark** on `logActivity()` + render functions → record **execution time + memory**. *(B6 "before")*
+- [ ] **PHPUnit golden-master** for `renderSearchResults()` → capture current HTML snapshot (the "expected" baseline).
+- [ ] **Katalon** E2E suite recorded against original app → all green; keep screenshots. *(B5 baseline)*
+
+**Baseline artifacts to store:** Sonar screenshot, PHPMD/jscpd output, benchmark numbers, HTML snapshot, Katalon report.
+
+---
+
+# ════════════ AFTER (Refactored) ════════════
+
+**Objective:** apply the 3 refactorings, prove behaviour unchanged, re-measure.
+
+### Phase 2 — Refactor (one smell per labelled commit)
+- [ ] **#1 `AdminController` → Extract Class** (do first — biggest structural change)
+  - Create `app/Controllers/Admin/` with focused controllers: `UsersController`, `ApiKeysController`, `ConfigurationsController`, `CodesController`, `ActivityController` (activity logs + log files + stats), `IpAccessController` (blocked + whitelisted IPs), `BackupsController`.
+  - Move each domain's methods over **verbatim**; `AdminController` keeps only `index()` (dashboard) as a thin shell.
+  - Update **only the controller name** in each `app/Config/Routes.php` line — **URL paths unchanged** (e.g. `admin/users` → `Admin\UsersController::users`).
+  - Commit: `refactor: extract AdminController domains into focused controllers (Extract Class, #1)`
+- [ ] **#5 add/update user → Introduce Parameter Object / Extract Method** *(do right after #1 — these methods now live in the extracted `UsersController`)*
+  - Extract the repeated user/social-link array into a builder/DTO.
+  - Commit: `refactor: extract user data builder to remove data clump in UsersController (#5)`
+- [ ] **#4 `logActivity()` → Introduce Parameter Object** *(independent — in `cms_helper.php`)*
+  - Create `ActivityLogData` DTO/value object; refactor signature; update call sites (now in the extracted controllers).
+  - Commit: `refactor: introduce ActivityLogData parameter object for logActivity (#4)`
+- [ ] **#3 render functions → Extract Method** *(independent — in `cms_helper.php`)*
+  - Extract shared result-rendering into one helper; both functions delegate to it.
+  - Commit: `refactor: extract shared search-result rendering to remove duplication (#3)`
+
+### Phase 3 — Prove behaviour preserved
+- [ ] **PHPUnit golden-master re-run** → HTML output **byte-for-byte identical** to baseline. ✅
+- [ ] **Katalon E2E re-run** against refactored app → all green; screenshots. ✅
+- [ ] **Manual smoke test** (`php spark serve`): login → search → add/update user → check activity log.
+- [ ] **GitHub Actions** green on the refactor branch.
+
+### Phase 4 — After measurements ("after")
+- [ ] **SonarCloud scan #2** → new LOC, complexity, duplication % + screenshot. *(B6 "after")*
+- [ ] **Micro-benchmark** re-run → execution time + memory. *(B6 "after")*
+- [ ] Copy refactored source into **`/refactored-code`**.
+
+---
+
+## 4. B6 metrics table (fill after both phases)
+
+| Metric | Original | Refactored | Improvement (%) | Source |
+|---|---|---|---|---|
+| Average Execution Time (ms) | — | — | — | local benchmark |
+| Memory Usage (MB) | — | — | — | local benchmark |
+| Lines of Code (LOC) | — | — | — | SonarCloud / phploc |
+| Cyclomatic Complexity | — | — | — | SonarCloud / PHPMD |
+| Duplication (%) | — | — | — | SonarCloud / jscpd |
+
+> **Honest expectation:** these are *maintainability* refactorings — expect clear wins in **LOC, complexity, and duplication**, but roughly **flat execution time** (Introduce Parameter Object may add tiny object-creation cost). We report this honestly.
+
+---
+
+## 5. Submission structure (B5 / requirements)
+
+```
+/original-code      ← frozen original (akassama, MIT, cited)
+/refactored-code    ← post-refactor source
+CODE_SMELLS_REPORT.md
+plan.md
+.github/workflows/analysis.yml
+sonar-project.properties
+tests/                ← PHPUnit characterization tests
+tests/benchmark/      ← time + memory harness
+katalon/              ← E2E project + reports
+report.pdf            ← 15+ pages, B1–B6 with before/after + screenshots
+```
+
+**Commit hygiene:** every refactor commit prefixed `refactor:` and references its smell number.
+
+---
+
+## 6. Open confirmations
+- [ ] Instructor accepts **GitHub + Actions** in place of literal "Jenkins" (brief says Jenkins link).
+- [ ] Test DB for PHPUnit: **SQLite in-memory** (recommended, already configured) vs dedicated MySQL test DB.

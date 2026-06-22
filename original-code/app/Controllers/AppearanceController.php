@@ -1,0 +1,865 @@
+<?php
+
+namespace App\Controllers;
+
+use App\Controllers\BaseController;
+use CodeIgniter\HTTP\ResponseInterface;
+use App\Constants\ActivityTypes;
+use App\Models\ThemesModel;
+use App\Models\ThemeRevisionsModel;
+
+class AppearanceController extends BaseController
+{
+    protected $session;
+    protected $db;
+
+    public function __construct()
+    {
+        $this->session = session();
+        $this->db = \Config\Database::connect();
+    }
+
+    public function index()
+    {
+        return view('back-end/appearance/index');
+    }
+
+    //############################//
+    //           Themes           //
+    //############################//
+    public function themes()
+    {
+        $tableName = 'themes';
+        $themesModel = new ThemesModel();
+    
+        // Set data to pass in view
+        $data = [
+            'themes' => $themesModel->orderBy('name', 'ASC')->findAll(),
+            'total_themes' => getTotalRecords($tableName)
+        ];
+    
+        return view('back-end/appearance/themes/index', $data);
+    }
+    
+    public function installThemes()
+    {
+        $allThemes = $this->getThemesData();
+
+        // Group themes
+        $popularThemes = array_filter($allThemes, fn($theme) => !empty($theme['is_popular']));
+        $latestThemes = array_filter($allThemes, fn($theme) => !empty($theme['is_new']));
+        $featuredThemes = array_filter($allThemes, fn($theme) => !empty($theme['is_featured']));
+        $premiumThemes = array_filter($allThemes, fn($theme) => !empty($theme['is_paid']));
+
+        $data = [
+            'themes' => $allThemes,
+            'popularThemes' => $popularThemes,
+            'latestThemes' => $latestThemes,
+            'featuredThemes' => $featuredThemes,
+            'premiumThemes' => $premiumThemes,
+            'has_error' => session()->getFlashdata('warning'),
+        ];
+
+        return view('back-end/appearance/themes/install-themes', $data);
+    }
+    
+    public function uploadTheme()
+    {
+        return view('back-end/appearance/themes/upload-theme');
+    }
+    
+    public function addTheme()
+    {
+        // Get logged-in user id
+        $loggedInUserId = $this->session->get('user_id');
+        $validation = \Config\Services::validation();
+
+        // Load the ThemesModel
+        $themesModel = new ThemesModel();
+
+        // Validate the file upload
+        $validation->setRules([
+            'theme_file' => [
+                'label' => 'Theme File',
+                'rules' => 'uploaded[theme_file]|ext_in[theme_file,zip]|max_size[theme_file,10240]', // 10MB max
+                'errors' => [
+                    'uploaded' => 'Please select a plugin file to upload',
+                    'ext_in' => 'Only ZIP files are allowed',
+                    'max_size' => 'Maximum file size is 10MB'
+                ]
+            ]
+        ]);
+
+        $actionUrl = $this->request->getUri()->getPath();
+        $previousData = null;
+        if (!$validation->withRequest($this->request)->run()) {
+            logActivity($loggedInUserId, ActivityTypes::FAILED_THEME_CREATION, 'Validation failed: ' . implode(', ', $validation->getErrors()), $actionUrl, null, json_encode($previousData), null);
+            return redirect()->back()->withInput()->with('errors', $validation->getErrors());
+        }
+
+        $themeFile = $this->request->getFile('theme_file');
+        $override = boolval($this->request->getPost('override_if_exists'));
+
+        // Create temporary directory for extraction
+        $tempDir = WRITEPATH . 'temp/theme_' . uniqid();
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+
+        // Move uploaded file to temp directory
+        $tempZipPath = $tempDir . '/theme.zip';
+        $themeFile->move($tempDir, 'theme.zip');
+
+        // Extract the zip file
+        $zip = new \ZipArchive();
+        if ($zip->open($tempZipPath) !== TRUE) {
+            $this->deleteDirectory($tempDir);
+            logActivity($loggedInUserId, ActivityTypes::FAILED_THEME_CREATION, 'Failed to open theme zip file', $actionUrl, null, json_encode($previousData), null);
+            return redirect()->back()->with('errorAlert', 'Failed to extract theme file');
+        }
+
+        $zip->extractTo($tempDir);
+        $zip->close();
+        unlink($tempZipPath); // Remove the zip file after extraction
+
+        // Check if theme.json exists
+        $themeJsonPath = $tempDir . '/theme.json';
+        if (!file_exists($themeJsonPath)) {
+            $this->deleteDirectory($tempDir);
+            logActivity($loggedInUserId, ActivityTypes::FAILED_THEME_CREATION, 'Theme.json file not found', $actionUrl, null, json_encode($previousData), null);
+            return redirect()->back()->with('errorAlert', 'theme.json file not found in the theme package');
+        }
+
+        // Read theme.json
+        $themeConfig = json_decode(file_get_contents($themeJsonPath), true);
+        if (json_last_error() !== JSON_ERROR_NONE || !isset($themeConfig['path'])) {
+            $this->deleteDirectory($tempDir);
+            logActivity($loggedInUserId, ActivityTypes::FAILED_THEME_CREATION, 'Invalid theme.json format', $actionUrl, null, json_encode($previousData), null);
+            return redirect()->back()->with('errorAlert', 'Invalid theme.json format');
+        }
+
+        $themePath = $themeConfig['path'];
+        $themeName = $themeConfig['name'] ?? 'Untitled Theme';
+        $themeViewsDir = APPPATH . 'Views/front-end/themes/' . $themePath;
+        $themeAssetsDir = FCPATH . 'public/front-end/themes/' . $themePath . '/assets';
+
+        // Check if theme already exists
+        $tableName = "themes";
+        $themeExists = recordExists($tableName, 'path', $themePath);
+        if ($themeExists && !$override) {
+            $this->deleteDirectory($tempDir);
+            logActivity($loggedInUserId, ActivityTypes::FAILED_THEME_CREATION, 'Theme already exists: ' . $themeName, $actionUrl, null, json_encode($previousData), null);
+            return redirect()->back()->with('errorAlert', 'A theme with this path already exists. Enable override option to replace it.');
+        }
+
+        // Create directories if they don't exist
+        if (!is_dir($themeViewsDir)) {
+            mkdir($themeViewsDir, 0755, true);
+        }
+        if (!is_dir($themeAssetsDir)) {
+            mkdir($themeAssetsDir, 0755, true);
+        }
+
+        // Move views
+        $tempViewsDir = $tempDir . '/views';
+        if (is_dir($tempViewsDir)) {
+            $this->copyDirectory($tempViewsDir, $themeViewsDir);
+        }
+
+        // Move assets
+        $tempAssetsDir = $tempDir . '/assets';
+        if (is_dir($tempAssetsDir)) {
+            $this->copyDirectory($tempAssetsDir, $themeAssetsDir);
+        }
+
+        // Prepare theme data for database
+        $themesData = [
+            'theme_id' => getGUID(),
+            'name' => $themeConfig['name'] ?? 'Untitled Theme',
+            'path' => $themeConfig['path'],
+            'default_color' => $themeConfig['default_color'] ?? '#000000',
+            'heading_color' => $themeConfig['heading_color'] ?? '#808080',
+            'accent_color' => $themeConfig['accent_color'] ?? '#FFFFFF',
+            'surface_color' => $themeConfig['surface_color'] ?? '#000000',
+            'contrast_color' => $themeConfig['contrast_color'] ?? '#808080',
+            'background_color' => $themeConfig['background_color'] ?? '#FFFFFF',
+            'theme_url' => $themeConfig['theme_url'] ?? '',
+            'image' => $themeConfig['image'] ?? '',
+            'category' => $themeConfig['category'] ?? 'General',
+            'sub_category' => $themeConfig['sub_category'] ?? '',
+            'selected' => 0,
+            'override_default_style' => 0,
+            'use_static_theme_nav' => $themeConfig['use_static_theme_nav'] ?? 0,
+            'plugins_required' => $themeConfig['plugins_required'] ?? '',
+            'deletable' => 1,
+            'created_by' => $loggedInUserId,
+            'updated_by' => null
+        ];
+
+        try {
+            if ($themeExists) {
+                deleteRecord($tableName, 'path', $themePath);
+            }
+            addRecord($tableName, $themesData);
+            logActivity($loggedInUserId, ActivityTypes::THEME_CREATION, 'Theme added to database: ' . $themeName, $actionUrl, null, json_encode($previousData), json_encode($themesData));
+        } catch (\Exception $e) {
+            $this->deleteDirectory($tempDir);
+            session()->setFlashdata('errorAlert', 'Failed to update theme database');
+            logActivity($loggedInUserId, ActivityTypes::FAILED_THEME_CREATION, 'Database update failed: ' . $themeName . ' - ' . $e->getMessage(), $actionUrl, null, json_encode($previousData), null);
+            return redirect()->to('/account/appearance/themes/upload-theme');
+        }
+
+        // Clean up temp directory
+        $this->deleteDirectory($tempDir);
+
+        // Theme uploaded successfully. Redirect to themes
+        $createSuccessMsg = str_replace('[Record]', 'Theme', lang('App.create_success_msg'));
+        session()->setFlashdata('successAlert', $createSuccessMsg);
+        return redirect()->to('/account/appearance/themes?tid='.$themeConfig['path']);
+    }
+  
+    public function editTheme($themeId)
+    {
+        $themesModel = new ThemesModel();
+    
+        // Fetch the data based on the id
+        $themeData = $themesModel->where('theme_id', $themeId)->first();
+    
+        if (!$themeData) {
+            $errorMsg = lang('App.not_found_msg');
+            session()->setFlashdata('errorAlert', $errorMsg);
+            return redirect()->to('/account/appearance/themes');
+        }
+    
+        // Set data to pass in view
+        $data = [
+            'theme_data' => $themeData
+        ];
+    
+        return view('back-end/appearance/themes/edit-theme', $data);
+    }
+    
+    public function updateTheme()
+    {
+        //get logged-in user id
+        $loggedInUserId = $this->session->get('user_id');
+    
+        $themesModel = new ThemesModel();
+    
+        // Custom validation rules
+        $rules = [
+            'theme_id' => 'required',
+            'name' => 'required',
+            'path' => 'required',
+        ];
+    
+        $themeId = $this->request->getPost('theme_id');
+        $data['theme_data'] = $themesModel->where('theme_id', $themeId)->first();
+
+        $actionUrl = $this->request->getUri()->getPath() . '/' . $themeId;
+        $previousData = $themesModel->where('theme_id', $themeId)->first();
+    
+        if($this->validate($rules)){       
+
+            //if selected, set the rest as not selected
+            if($this->request->getPost('selected') == "1"){
+                $updatedData = [
+                    'selected' => 0
+                ];
+
+                $updateWhereClause = "theme_id != 'NULL'";
+
+                updateRecord('themes', $updatedData, $updateWhereClause);
+            }
+
+            $db = \Config\Database::connect();
+            $builder = $db->table('themes');
+            $data = [
+                'name' => $this->request->getPost('name'),
+                'path'  => $this->request->getPost('path'),
+                'default_color'  => $this->request->getPost('default_color'),
+                'heading_color'  => $this->request->getPost('heading_color'),
+                'accent_color'  => $this->request->getPost('accent_color'),
+                'surface_color'  => $this->request->getPost('surface_color'),
+                'contrast_color'  => $this->request->getPost('contrast_color'),
+                'background_color'  => $this->request->getPost('background_color'),
+                'image'  => $this->request->getPost('image'),
+                'theme_url'  => $this->request->getPost('theme_url'),
+                'category'  => $this->request->getPost('category'),
+                'sub_category'  => $this->request->getPost('sub_category'),
+                'selected'  => $this->request->getPost('selected') ?? 0,
+                'override_default_style'  => $this->request->getPost('override_default_style') ?? 0,
+                'use_static_theme_nav'  => $this->request->getPost('use_static_theme_nav') ?? 0,
+                'plugins_required' => $this->request->getPost('plugins_required') ?? '',
+                'deletable' => $this->request->getPost('deletable') ?? 1,
+                'created_by' => $this->request->getPost('created_by'),
+                'updated_by' => $loggedInUserId
+            ];
+    
+            $builder->where('theme_id', $themeId);
+            $builder->update($data);
+    
+            // Record updated successfully. Redirect to dashboard
+            $editSuccessMsg = str_replace('[Record]', 'Theme', lang('App.edit_success_msg'));
+            session()->setFlashdata('successAlert', $editSuccessMsg);
+    
+            //log activity
+            logActivity($loggedInUserId, ActivityTypes::THEME_UPDATE, 'Theme updated with id: ' . $themeId, $actionUrl, get_class($themesModel), $themeId, json_encode($previousData), json_encode($data));
+    
+            return redirect()->to('/account/appearance/themes/edit-theme/'. $themeId);
+        }
+        else{
+            $data['validation'] = $this->validator;
+            $errorMsg = lang('App.missing_inputs_msg');
+            session()->setFlashdata('errorAlert', $errorMsg);
+    
+            //log activity
+            logActivity($loggedInUserId, ActivityTypes::FAILED_THEME_UPDATE, 'Failed to update theme with name: ' . $this->request->getPost('name'), $actionUrl, get_class($themesModel), $themeId, json_encode($previousData), json_encode($data));
+    
+            return view('back-end/appearance/themes/edit-theme', $data);
+        }
+    }
+
+    public function activateTheme($themeId)
+    {
+        //get logged-in user id
+        $loggedInUserId = $this->session->get('user_id');
+    
+        $themesModel = new ThemesModel();
+    
+        // Fetch the data based on the id
+        $themeData = $themesModel->where('theme_id', $themeId)->first();
+        $previousData = $themesModel->where('theme_id', $themeId)->first();
+    
+        if (!$themeData) {
+            $errorMsg = lang('App.not_found_msg');
+            session()->setFlashdata('errorAlert', $errorMsg);
+            return redirect()->to('/account/appearance/themes');
+        }
+
+        //reset selected themes
+        $updatedData = [
+            'selected' => 0
+        ];
+
+        $updateWhereClause = "theme_id != 'NULL'";
+        updateRecord('themes', $updatedData, $updateWhereClause);
+
+        //set as active
+        $updateColumn =  "'selected' = '1'";
+        $updateWhereClause = "theme_id = '$themeId'";
+        $result = updateRecordColumn("themes", $updateColumn, $updateWhereClause);
+
+        // Record updated successfully. Redirect to dashboard
+        $editSuccessMsg = str_replace('[Record]', 'Theme', lang('App.edit_success_msg'));
+        session()->setFlashdata('successAlert', $editSuccessMsg);
+
+        $actionUrl = $this->request->getUri()->getPath() . '/' . $themeId;
+
+        //log activity
+        logActivity($loggedInUserId, ActivityTypes::THEME_UPDATE, 'Theme with id: ' . $themeId. 'set as active.', $actionUrl, get_class($themesModel), $themeId, json_encode($previousData), null);
+
+        return redirect()->to('/account/appearance/themes');
+    }
+
+    public function removeTheme()
+    {
+        // Get logged-in user id
+        $loggedInUserId = $this->session->get('user_id');
+
+        $tableName = "themes";
+        $pkName = "theme_id";
+        $themeId = $this->request->getPost('theme_id');
+        $themePath = $this->request->getPost('theme_path');
+
+        // Show demo message
+        if (boolval(env('DEMO_MODE', "false"))) {
+            $errorMsg = "Action not available in the demo mode.";
+            session()->setFlashdata('warningAlert', $errorMsg);
+            return redirect()->to('/account/appearance/themes');
+        }
+
+        
+        $themesModel = new ThemesModel();
+        $actionUrl = $this->request->getUri()->getPath();
+        $previousData = $themesModel->where('theme_id', $themeId)->first();
+
+        try {
+            // First get theme data to check if it's deletable
+            $theme = $themesModel->where('theme_id', $themeId)->first();
+            
+            if (!$theme) {
+                throw new \Exception("Theme not found");
+            }
+
+            // Check if theme is marked as deletable
+            if (!$theme['deletable']) {
+                throw new \Exception("This theme cannot be deleted");
+            }
+
+            // Define directories to delete
+            $themeViewsDir = APPPATH . 'Views/front-end/themes/' . $themePath;
+            $themeAssetsDir = FCPATH . 'public/front-end/themes/' . $themePath . '/assets';
+
+            // Remove theme files (if they exist)
+            if (is_dir($themeViewsDir)) {
+                $this->deleteDirectory($themeViewsDir);
+            }
+
+            if (is_dir($themeAssetsDir)) {
+                $this->deleteDirectory($themeAssetsDir);
+            }
+
+            // Also try to remove the parent assets directory if empty
+            $parentAssetsDir = dirname($themeAssetsDir);
+            if (is_dir($parentAssetsDir) && count(scandir($parentAssetsDir)) == 2) { // empty dir has 2 entries (. and ..)
+                rmdir($parentAssetsDir);
+            }
+
+            // Remove record from database
+            deleteRecord($tableName, $pkName, $themeId);
+
+            $createSuccessMsg = lang('App.delete_success_msg');
+            session()->setFlashdata('successAlert', $createSuccessMsg);
+
+            // Log activity
+            logActivity($loggedInUserId, ActivityTypes::THEME_DELETION, 'User with id: ' . $loggedInUserId . ' deleted theme for table name: ' . $tableName .' with path: ' . $themePath, $actionUrl, get_class($themesModel), $themeId, json_encode($previousData), null);
+
+            return redirect()->to('/account/appearance/themes');
+        }
+        catch (\Exception $e) {
+            $errorMsg = $e->getMessage();
+            session()->setFlashdata('errorAlert', $errorMsg);
+
+            // Log activity (use specific constant for theme deletion failure)
+            logActivity($loggedInUserId, ActivityTypes::FAILED_THEME_DELETION, 'User with id: ' . $loggedInUserId . ' failed to delete theme for table name: ' . $tableName .' with path: ' . $themePath . '. Error: ' . $errorMsg, $actionUrl, get_class($themesModel), $themeId, json_encode($previousData), null);
+
+            return redirect()->to('/account/appearance/themes');
+        }
+    }
+
+    protected function getThemesData()
+    {
+        $url =  env('THEMES_API_ENDPOINT');
+        $json = @file_get_contents($url);
+
+        if ($json === false) {
+            // Handle error, maybe return an empty array or log the error
+            return [];
+        }
+
+        $data = json_decode($json, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            // Handle JSON decoding error
+            return [];
+        }
+
+        return $data;
+    }
+
+    /**
+     * Helper function to copy directory recursively
+     */
+    private function copyDirectory($source, $destination)
+    {
+        if (!is_dir($destination)) {
+            mkdir($destination, 0755, true);
+        }
+
+        $dir = opendir($source);
+        while (($file = readdir($dir)) !== false) {
+            if ($file != '.' && $file != '..') {
+                $srcFile = $source . '/' . $file;
+                $destFile = $destination . '/' . $file;
+
+                if (is_dir($srcFile)) {
+                    $this->copyDirectory($srcFile, $destFile);
+                } else {
+                    copy($srcFile, $destFile);
+                }
+            }
+        }
+        closedir($dir);
+    }
+
+    /**
+     * Helper function to delete directory recursively
+     */
+    private function deleteDirectory($dir)
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $files = array_diff(scandir($dir), ['.', '..']);
+        foreach ($files as $file) {
+            $path = $dir . '/' . $file;
+            if (is_dir($path)) {
+                $this->deleteDirectory($path);
+            } else {
+                unlink($path);
+            }
+        }
+        rmdir($dir);
+    }
+
+    
+    //############################//
+    //        Theme Files         //
+    //############################//
+    public function viewFiles()
+    {
+        return view('back-end/appearance/theme-editor/index');
+    }
+
+    public function homeFileEditor()
+    {
+        // Get the file you want to edit
+        $homeFilePath = APPPATH . 'Views/front-end/themes/' . getCurrentTheme() . '/home/index.php';
+        
+        // Get only the file name (not the whole path) to display it
+        $homeFilename = basename($homeFilePath);
+
+        if (!file_exists($homeFilePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+
+        // Load the file content
+        $homeFileContent = file_get_contents($homeFilePath);
+        
+        $data = [
+            'homeFilename' => $homeFilename,
+            'homeFilePath' => $homeFilePath,
+            'homeFileContent' => $homeFileContent
+        ];
+
+        return view('back-end/appearance/theme-editor/home', $data);
+    }
+
+    public function layoutFileEditor()
+    {
+        // Get the file you want to edit
+        $layoutFilePath = APPPATH . 'Views/front-end/themes/' . getCurrentTheme() . '/layout/_layout.php';
+        
+        // Get only the file name (not the whole path) to display it
+        $layoutFilename = basename($layoutFilePath);
+
+        if (!file_exists($layoutFilePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+
+        // Load the file content
+        $layoutFileContent = file_get_contents($layoutFilePath);
+        
+        $data = [
+            'layoutFilename' => $layoutFilename,
+            'layoutFilePath' => $layoutFilePath,
+            'layoutFileContent' => $layoutFileContent
+        ];
+
+        return view('back-end/appearance/theme-editor/layout', $data);
+    }
+
+    public function blogsFileEditor()
+    {
+        // Get the file you want to edit
+        $blogsFilePath = APPPATH . 'Views/front-end/themes/' . getCurrentTheme() . '/blogs/index.php';
+        
+        // Get only the file name (not the whole path) to display it
+        $blogsFilename = basename($blogsFilePath);
+
+        if (!file_exists($blogsFilePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+
+        // Load the file content
+        $blogsFileContent = file_get_contents($blogsFilePath);
+        
+        $data = [
+            'blogsFilename' => $blogsFilename,
+            'blogsFilePath' => $blogsFilePath,
+            'blogsFileContent' => $blogsFileContent
+        ];
+
+        return view('back-end/appearance/theme-editor/blogs', $data);
+    }
+
+    public function viewBlogFileEditor()
+    {
+        // Get the file you want to edit
+        $viewBlogFilePath = APPPATH . 'Views/front-end/themes/' . getCurrentTheme() . '/blogs/view-blog.php';
+        
+        // Get only the file name (not the whole path) to display it
+        $viewBlogFilename = basename($viewBlogFilePath);
+
+        if (!file_exists($viewBlogFilePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+
+        // Load the file content
+        $viewBlogFileContent = file_get_contents($viewBlogFilePath);
+        
+        $data = [
+            'viewBlogFilename' => $viewBlogFilename,
+            'viewBlogFilePath' => $viewBlogFilePath,
+            'viewBlogFileContent' => $viewBlogFileContent
+        ];
+
+        return view('back-end/appearance/theme-editor/view-blog', $data);
+    }
+
+    public function viewPageFileEditor()
+    {
+        // Get the file you want to edit
+        $viewPageFilePath = APPPATH . 'Views/front-end/themes/' . getCurrentTheme() . '/pages/view-page.php';
+        
+        // Get only the file name (not the whole path) to display it
+        $viewPageFilename = basename($viewPageFilePath);
+
+        if (!file_exists($viewPageFilePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+
+        // Load the file content
+        $viewPageFileContent = file_get_contents($viewPageFilePath);
+        
+        $data = [
+            'viewPageFilename' => $viewPageFilename,
+            'viewPageFilePath' => $viewPageFilePath,
+            'viewPageFileContent' => $viewPageFileContent
+        ];
+
+        return view('back-end/appearance/theme-editor/view-page', $data);
+    }
+
+    public function searchFileEditor()
+    {
+        // Get the file you want to edit
+        $searchFilePath = APPPATH . 'Views/front-end/themes/' . getCurrentTheme() . '/search/index.php';
+        
+        // Get only the file name (not the whole path) to display it
+        $searchFilename = basename($searchFilePath);
+
+        if (!file_exists($searchFilePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+
+        // Load the file content
+        $searchFileContent = file_get_contents($searchFilePath);
+        
+        $data = [
+            'searchFilename' => $searchFilename,
+            'searchFilePath' => $searchFilePath,
+            'searchFileContent' => $searchFileContent
+        ];
+
+        return view('back-end/appearance/theme-editor/search', $data);
+    }
+
+    public function searchFilterFileEditor()
+    {
+        // Get the file you want to edit
+        $searchFilterFilePath = APPPATH . 'Views/front-end/themes/' . getCurrentTheme() . '/search/filter.php';
+        
+        // Get only the file name (not the whole path) to display it
+        $searchFilterFilename = basename($searchFilterFilePath);
+
+        if (!file_exists($searchFilterFilePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+
+        // Load the file content
+        $searchFilterFileContent = file_get_contents($searchFilterFilePath);
+        
+        $data = [
+            'searchFilterFilename' => $searchFilterFilename,
+            'searchFilterFilePath' => $searchFilterFilePath,
+            'searchFilterFileContent' => $searchFilterFileContent
+        ];
+
+        return view('back-end/appearance/theme-editor/search-filter', $data);
+    }
+
+    public function siteCSSFileEditor()
+    {
+        // Get the file you want to edit
+        $siteCSSFilePath = FCPATH . 'public/front-end/themes/' . getCurrentTheme() . '/assets/css/site.css';
+        
+        // Get only the file name (not the whole path) to display it
+        $siteCSSFilename = basename($siteCSSFilePath);
+
+        if (!file_exists($siteCSSFilePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+
+        // Load the file content
+        $siteCSSFileContent = file_get_contents($siteCSSFilePath);
+        
+        $data = [
+            'siteCSSFilename' => $siteCSSFilename,
+            'siteCSSFilePath' => $siteCSSFilePath,
+            'siteCSSFileContent' => $siteCSSFileContent
+        ];
+
+        return view('back-end/appearance/theme-editor/site-css', $data);
+    }
+
+    public function siteJSFileEditor()
+    {
+        // Get the file you want to edit
+        $siteJSFilePath = FCPATH . 'public/front-end/themes/' . getCurrentTheme() . '/assets/js/site.js';
+        
+        // Get only the file name (not the whole path) to display it
+        $siteJSFilename = basename($siteJSFilePath);
+
+        if (!file_exists($siteJSFilePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+
+        // Load the file content
+        $siteJSFileContent = file_get_contents($siteJSFilePath);
+        
+        $data = [
+            'siteJSFilename' => $siteJSFilename,
+            'siteJSFilePath' => $siteJSFilePath,
+            'siteJSFileContent' => $siteJSFileContent
+        ];
+
+        return view('back-end/appearance/theme-editor/site-js', $data);
+    }
+
+    public function saveFile()
+    {
+        $filePage = $this->request->getPost('filePage');
+        $filePath = $this->request->getPost('filePath');
+        $fileContent = $this->request->getPost('fileContent');
+    
+        if (!file_exists($filePath)) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException("File not found");
+        }
+    
+        if (file_put_contents($filePath, $fileContent) === false) {
+            return redirect()->to('/account/appearance/theme-editor/'.$filePage)->with('error', 'Failed to save the file.');
+        }
+    
+        return redirect()->to('/account/appearance/theme-editor/'.$filePage)->with('success', 'File saved successfully.');
+    }
+
+    // In AppearanceController.php (assuming necessary setup and ThemeRevisionsModel)
+    public function saveVersion()
+    {
+        // Load the model
+        $revisionModel = new ThemeRevisionsModel();
+        $session = session();
+
+        // 1. Get identifiers
+        $loggedInUserId = $session->get('user_id');
+        // Assuming getCurrentTheme() is a helper/method that returns the active theme name
+        $themeName = getCurrentTheme(); 
+        $fileId = $this->request->getGet('id');
+        
+        // Base path for theme files
+        $baseThemePath = APPPATH . 'Views/front-end/themes/' . $themeName; 
+
+        if (empty($fileId)) {
+            return redirect()->to('/account/appearance/theme-editor');
+        }
+
+        // 2. Determine File Path and Content
+        $filePathName = ""; // Relative path (for DB storage)
+        $fullFilePath = ""; // Full system path (for reading)
+
+        switch ($fileId) {
+            case "layout":
+                $filePathName = "/layout/_layout.php";
+                break;
+            case "home":
+                $filePathName = "/home/index.php";
+                break;
+            case "blogs":
+                $filePathName = "/blogs/index.php";
+                break;
+            case "view-blog":
+                $filePathName = "/blogs/view-blog.php";
+                break;
+            case "view-page":
+                $filePathName = "/pages/view-page.php";
+                break;
+            case "search":
+                $filePathName = "/search/index.php";
+                break;
+            case "search-filter":
+                $filePathName = "/search/filter.php";
+                break;
+            case "site-css":
+                $filePathName = "/assets/css/site.css";
+                break;
+            case "site-js":
+                $filePathName = "/assets/js/site.js";
+                break;
+            default:
+                return redirect()->to('/account/appearance/theme-editor')->with('errorAlert', 'Invalid file identifier.');
+        }
+
+        //update base path if site.css or site.js
+        if($fileId === "site-css" || $fileId === "site-js"){
+            // Base path for theme files
+            $baseThemePath = FCPATH . 'public/front-end/themes/' . $themeName; 
+        }
+        
+        $fullFilePath = $baseThemePath . $filePathName;
+
+        // Check if the file exists on the disk
+        if (!is_file($fullFilePath)) {
+            return redirect()->to('/account/appearance/theme-editor')->with('errorAlert', 'Theme file not found on the server.');
+        }
+
+        $actionUrl = $this->request->getUri()->getPath() . '/' . $fileId;
+        $previousData = null;
+        
+        // Read the content of the file from the filesystem
+        $fileContent = file_get_contents($fullFilePath);
+        
+        // 3. Save file copy in db
+        $themeRevisionId = getGUID(); // Generating UUID for custom primary key
+
+        $data = [
+            'theme_revision_id' => $themeRevisionId,
+            'theme_name'        => $themeName,
+            'file_path'         => $filePathName, // Save the relative path
+            'file_content'      => $fileContent,  // Content from the disk
+            'revision_note'     => 'Revision saved via editor button.',
+            'created_by'        => $loggedInUserId,
+        ];
+
+        $fileSaved = $revisionModel->insert($data);
+
+        // 4. Redirect with status
+        if (!$fileSaved) {
+            // Log the error for debugging
+            logActivity($loggedInUserId, ActivityTypes::FAILED_THEME_REVISION_SAVE, 'Failed to save theme revision for file: ' . $filePathName, $actionUrl, get_class($revisionModel), $themeRevisionId, json_encode($previousData), json_encode($data));
+            // Use $fileId for redirect since that's what's expected by the editor view
+            return redirect()->to('/account/appearance/theme-editor/' . $fileId)->with('errorAlert', 'Failed to save the file version to the database.');
+        }
+
+        // Log successful save        
+        logActivity($loggedInUserId, ActivityTypes::THEME_REVISION_SAVE, 'Saved theme revision for file: ' . $filePathName, $actionUrl, get_class($revisionModel), $themeRevisionId, json_encode($previousData), json_encode($data));
+        return redirect()->to('/account/appearance/theme-editor/' . $fileId)->with('success', 'File version saved successfully.');
+    }
+
+    public function themeVersions()
+    {
+        $tableName = 'theme_revisions';
+        $themesRevisionsModel = new ThemeRevisionsModel();
+
+        // Set data to pass in view
+        $data = [
+            'theme_revisions' => $themesRevisionsModel->orderBy('created_at', 'DESC')->paginate(intval(env('PAGINATE_HIGH', 100))),
+            'pager' => $themesRevisionsModel->pager,
+            'total_revisions' => $themesRevisionsModel->pager->getTotal()
+        ];
+    
+        return view('back-end/appearance/revisions/index', $data);
+    }
+}

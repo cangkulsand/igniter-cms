@@ -1,0 +1,44 @@
+<!-- include layout -->
+<?= $this->extend('back-end/layout/_layout') ?>
+
+<!-- page title -->
+<?= $this->section('title') ?><?= lang('App.search_results') ?><?= $this->endSection() ?>
+
+<!-- begin main content -->
+<?= $this->section('content') ?>
+
+<?php
+// Breadcrumbs
+$breadcrumb_links = array(
+    array('title' => lang('App.dashboard'), 'url' => '/account'),
+    array('title' => lang('App.search_results'))
+);
+echo generateBreadcrumb($breadcrumb_links);
+?>
+
+<div class="row">
+    <!--Content-->
+    <div class="col-12">
+        <h3><?= lang('App.search_results_for') ?> <span class="text-danger">"<?= $searchQuery ?>"</span></h3>
+    </div>
+
+    <div class="col-12">
+        <?php if (!empty($searchResults)): ?>
+            <ul class="list-group">
+                <?php foreach ($searchResults as $result): ?>
+                    <li class="list-group-item">
+                        <p>
+                            <strong><?= $result['module_name'] ?>:</strong> (<?= $result['module_description'] ?>)
+                        </p>
+                        <a href="<?= base_url('/' . $result['module_link']) ?>"><?= lang('App.view_details') ?></a>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p><?= lang('App.no_results_found') ?></p>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- end main content -->
+<?= $this->endSection() ?>

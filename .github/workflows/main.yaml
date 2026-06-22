@@ -26,3 +26,5 @@ jobs:
             **/node_modules/**
             .github/**
             install/database.sql
+            original-code/**
+            refactored-code/**

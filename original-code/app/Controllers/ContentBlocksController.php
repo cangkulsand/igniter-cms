@@ -1,0 +1,175 @@
+<?php
+
+namespace App\Controllers;
+
+use App\Constants\ActivityTypes;
+use App\Controllers\BaseController;
+use CodeIgniter\HTTP\ResponseInterface;
+use App\Models\ContentBlocksModel;
+
+class ContentBlocksController extends BaseController
+{
+
+    protected $session;
+    public function __construct()
+    {
+        // Initialize session once in the constructor
+        $this->session = session();
+    }
+
+    //############################//
+    //       Content Blocks       //
+    //############################//
+    public function contentBlocks()
+    {
+        $tableName = 'content_blocks';
+        $contentBlocksModel = new ContentBlocksModel();
+
+        // Set data to pass in view
+        $data = [
+            'content_blocks' => $contentBlocksModel->orderBy('created_at', 'DESC')->findAll(),
+            'total_content_blocks' => getTotalRecords($tableName)
+        ];
+
+        return view('back-end/content-blocks/index', $data);
+    }
+
+    public function newContentBlock()
+    {
+        return view('back-end/content-blocks/new-content-block');
+    }
+
+    public function addContentBlock()
+    {
+        $loggedInUserId = $this->session->get('user_id');
+        $contentBlocksModel = new ContentBlocksModel();
+
+        if (!$this->validate($contentBlocksModel->getValidationRules())) {
+            return view('back-end/content-blocks/new-content-block', ['validation' => $this->validator]);
+        }
+
+        $actionUrl = $this->request->getUri()->getPath();
+        $previousData = null;
+        $data = [
+            'identifier' => $this->request->getPost('identifier'),
+            'author' => $loggedInUserId,
+            'title' => $this->request->getPost('title'),
+            'description' => $this->request->getPost('description'),
+            'content' => $this->request->getPost('content'),
+            'icon' => $this->request->getPost('icon'),
+            'group' => $this->request->getPost('group'),
+            'image' => $this->request->getPost('image'),
+            'video' => $this->request->getPost('video'),
+            'file' => $this->request->getPost('file'),
+            'link' => $this->request->getPost('link'),
+            'new_tab' => $this->request->getPost('new_tab'),
+            'order' => $this->request->getPost('order') ?? 10,
+            'custom_field_1'  => $this->request->getPost('custom_field_1'),
+            'custom_field_2'  => $this->request->getPost('custom_field_2'),
+            'custom_field_3'  => $this->request->getPost('custom_field_3'),
+            'custom_field_4'  => $this->request->getPost('custom_field_4'),
+            'custom_field_5'  => $this->request->getPost('custom_field_5'),
+            'custom_field_6'  => $this->request->getPost('custom_field_6'),
+            'custom_field_7'  => $this->request->getPost('custom_field_7'),
+            'custom_field_8'  => $this->request->getPost('custom_field_8'),
+            'custom_field_9'  => $this->request->getPost('custom_field_9'),
+            'custom_field_10' => $this->request->getPost('custom_field_10'),
+            'created_by' => $loggedInUserId,
+            'updated_by' => null,
+        ];
+
+        if ($contentBlocksModel->createContentBlock($data)) {
+            $insertedId = $contentBlocksModel->getInsertID();
+            $createSuccessMsg = str_replace('[Record]', 'Content Block', lang('App.create_success_msg'));
+            session()->setFlashdata('successAlert', $createSuccessMsg);
+            logActivity($loggedInUserId, ActivityTypes::CONTENT_BLOCK_CREATION, 'Content block created with id: ' . $insertedId, $actionUrl, get_class($contentBlocksModel), $insertedId, json_encode($previousData), null);
+            return redirect()->to('/account/content-blocks');
+        } else {
+            session()->setFlashdata('errorAlert', lang('App.error_msg'));
+            logActivity($loggedInUserId, ActivityTypes::FAILED_CONTENT_BLOCK_CREATION, 'Failed to create content block with title: ' . $data['title'], $actionUrl, get_class($contentBlocksModel), null, json_encode($previousData), null);
+            return view('back-end/content-blocks/new-content-block');
+        }
+    }
+
+    public function viewContentBlock($contentBlockId)
+    {
+        $tableName = 'content_blocks';
+        //Check if record exists
+        if (!recordExists($tableName, "content_id", $contentBlockId)) {
+            $errorMsg = lang('App.not_found_msg');
+            session()->setFlashdata('errorAlert', $errorMsg);
+            return redirect()->to('/account/content-blocks');
+        }
+
+        $contentBlocksModel = new ContentBlocksModel();
+        $data = ['content_block_data' => $contentBlocksModel->find($contentBlockId)];
+        return view('back-end/content-blocks/view-content-block', $data);
+    }
+
+    public function editContentBlock($contentBlockId)
+    {
+        $tableName = 'content_blocks';
+        //Check if record exists
+        if (!recordExists($tableName, "content_id", $contentBlockId)) {
+            $errorMsg = lang('App.not_found_msg');
+            session()->setFlashdata('errorAlert', $errorMsg);
+            return redirect()->to('/account/content-blocks');
+        }
+
+        $contentBlocksModel = new ContentBlocksModel();
+        $data = ['content_block_data' => $contentBlocksModel->find($contentBlockId)];
+        return view('back-end/content-blocks/edit-content-block', $data);
+    }
+
+    public function updateContentBlock()
+    {
+        $loggedInUserId = $this->session->get('user_id');
+        $contentBlocksModel = new ContentBlocksModel();
+        $contentBlockId = $this->request->getPost('content_id');
+
+        if (!$this->validate($contentBlocksModel->getValidationRules())) {
+            return view('back-end/content-blocks/edit-content-block', ['validation' => $this->validator, 'content_block_data' => $contentBlocksModel->find($contentBlockId)]);
+        }
+
+        $actionUrl = $this->request->getUri()->getPath();
+        $previousData = $contentBlocksModel->find($contentBlockId);
+        $data = [
+            'identifier' => $this->request->getPost('identifier'),
+            'author' => $loggedInUserId,
+            'title' => $this->request->getPost('title'),
+            'description' => $this->request->getPost('description'),
+            'content' => $this->request->getPost('content'),
+            'icon' => $this->request->getPost('icon'),
+            'group' => $this->request->getPost('group'),
+            'image' => $this->request->getPost('image'),
+            'video' => $this->request->getPost('video'),
+            'file' => $this->request->getPost('file'),
+            'link' => $this->request->getPost('link'),
+            'new_tab' => $this->request->getPost('new_tab'),
+            'order' => $this->request->getPost('order') ?? 10,
+            'custom_field_1'  => $this->request->getPost('custom_field_1'),
+            'custom_field_2'  => $this->request->getPost('custom_field_2'),
+            'custom_field_3'  => $this->request->getPost('custom_field_3'),
+            'custom_field_4'  => $this->request->getPost('custom_field_4'),
+            'custom_field_5'  => $this->request->getPost('custom_field_5'),
+            'custom_field_6'  => $this->request->getPost('custom_field_6'),
+            'custom_field_7'  => $this->request->getPost('custom_field_7'),
+            'custom_field_8'  => $this->request->getPost('custom_field_8'),
+            'custom_field_9'  => $this->request->getPost('custom_field_9'),
+            'custom_field_10' => $this->request->getPost('custom_field_10'),
+            'created_by' => $this->request->getPost('created_by'),
+            'updated_by' => $loggedInUserId
+        ];
+
+        if ($contentBlocksModel->updateContentBlock($contentBlockId, $data)) {
+            $editSuccessMsg = str_replace('[Record]', 'Content Block', lang('App.edit_success_msg'));
+            session()->setFlashdata('successAlert', $editSuccessMsg);
+            logActivity($loggedInUserId, ActivityTypes::CONTENT_BLOCK_UPDATE, 'Content block updated with id: ' . $contentBlockId, $actionUrl, get_class($contentBlocksModel), $contentBlockId, json_encode($previousData), json_encode($data));
+            return redirect()->to('/account/content-blocks');
+        } else {
+            session()->setFlashdata('errorAlert', lang('App.error_msg'));
+            logActivity($loggedInUserId, ActivityTypes::FAILED_CONTENT_BLOCK_UPDATE, 'Failed to update content block with id: ' . $contentBlockId, $actionUrl, get_class($contentBlocksModel), null, json_encode($previousData), json_encode($data));
+            return redirect()->to('/account/edit-content-block/' . $contentBlockId);
+        }
+    }
+}

@@ -1,0 +1,40 @@
+<!-- include layout -->
+<?= $this->extend('back-end/layout/_layout') ?>
+
+<!-- page title -->
+<?= $this->section('title') ?><?= lang('App.manage_plugins') ?><?= $this->endSection() ?>
+
+<!-- begin main content -->
+<?= $this->section('content') ?>
+
+<?php
+// Breadcrumbs
+$breadcrumb_links = array(
+    array('title' => lang('App.dashboard'), 'url' => '/account'),
+    array('title' => lang('App.plugins'), 'url' => '/account/plugins'),
+    array('title' => lang('App.manage_plugin'))
+);
+echo generateBreadcrumb($breadcrumb_links);
+?>
+<div class="row">
+    <!--Content-->
+    <div class="col-12">
+        <h3><?= lang('App.manage_plugin') ?> - <?=$pluginName?></h3>
+    </div>
+    <!--Content-->
+    <div class="col-12">
+        <div class="card p-2 mb-4 plugin-card">
+            <?php if ($pluginManageFile): ?>
+                <?php include($pluginManageFile); ?>
+            <?php else: ?>
+                <div class="alert alert-info"><?= lang('App.no_plugin_interface') ?></div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Include the files modal -->
+<?=  $this->include('back-end/layout/modals/_files_modal.php'); ?>
+
+<!-- end main content -->
+<?= $this->endSection() ?>

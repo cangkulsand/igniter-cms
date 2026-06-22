@@ -1,0 +1,95 @@
+<?php
+$session = session();
+// Get session data
+$sessionName = $session->get('first_name').' '.$session->get('last_name');
+$sessionEmail = $session->get('email');
+$userRole = getUserRole($sessionEmail);
+?>
+
+<!-- include layout -->
+<?= $this->extend('back-end/layout/_layout') ?>
+
+<!-- page title -->
+<?= $this->section('title') ?><?= lang('App.search_filter_editor') ?><?= $this->endSection() ?>
+
+<!-- begin main content -->
+<?= $this->section('content') ?>
+
+<?php
+// Breadcrumbs
+$breadcrumb_links = array(
+    array('title' => lang('App.dashboard'), 'url' => '/account'),
+    array('title' => lang('App.appearance'), 'url' => '/account/appearance'),
+    array('title' => lang('App.theme_editor'), 'url' => '/account/appearance/theme-editor'),
+    array('title' => lang('App.search_filter_editor'))
+);
+echo generateBreadcrumb($breadcrumb_links);
+?>
+
+<div class="row">
+    <!--Content-->
+    <div class="col-12">
+        <h3><?= lang('App.file_editor') ?></h3>
+        <button class="btn btn-dark my-1 float-end" type="button" data-bs-toggle="modal" data-bs-target="#ciFileManagerModal">
+            <i class="ri-image-fill"></i> <?= lang('App.file_manager') ?>
+        </button>
+    </div>
+    <div class="col-12">  
+        <form id="saveFileForm" method="post" action="<?= base_url('account/appearance/theme-editor/save-file') ?>">
+            <!--Edit Card-->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <a href="<?= base_url('/account/appearance/theme-editor') ?>" class="btn btn-outline-danger">
+                            <i class="ri-arrow-left-fill"></i> <?= lang('App.back') ?>
+                        </a>
+                    </div>
+                    <div>
+                        <i class="ri-file-edit-line"></i>
+                        <?= lang('App.editing') ?> <?='.../Views/front-end/themes/'.getCurrentTheme().'/search/'.$searchFilterFilename?>
+                    </div>
+                    <div>
+                        <a href="<?= base_url('account/appearance/theme-editor/save-version?id=search-filter') ?>" class="btn btn-outline-secondary me-2" id="saveVersionBtn">
+                            <i class="ri-history-line"></i> <?= lang('App.save_version') ?>
+                        </a>
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="ri-save-line"></i> <?= lang('App.save_file') ?>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <?php if (session()->has('success')): ?>
+                                <div class="alert alert-success alert-dismissible">
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    <?= session('success') ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if (session()->has('error')): ?>
+                                <div class="alert alert-danger alert-dismissible">
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    <?= session('error') ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div id="editor" style="height: 75em; width: 100%;"><?= htmlspecialchars($searchFilterFileContent) ?></div>
+                    <input type="hidden" name="filePath" value="<?= $searchFilterFilePath ?>">
+                    <input type="hidden" name="filePage" value="search-filter">
+                    <textarea name="fileContent" id="fileContent" style="display:none;"></textarea>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Include the code editor script -->
+<?=  $this->include('back-end/appearance/theme-editor/_file_editor_initiator.php'); ?>
+
+<!-- Include the files modal -->
+<?=  $this->include('back-end/layout/modals/_files_modal.php'); ?>
+
+<!-- end main content -->
+<?= $this->endSection() ?>

@@ -1,0 +1,509 @@
+<?php
+use App\Constants\ActivityTypes;
+
+/**
+ * Validates the honeypot input and the timestamp.
+ * If the honeypot field has a value or the form was submitted too quickly, it blocks the IP.
+ *
+ * @param {string} $honeypotInput The value of the honeypot input field.
+ * @param {int} $submittedTimestamp The timestamp submitted with the form.
+ * @returns {void}
+ */
+if (!function_exists('validateHoneypotInput')) {
+    function validateHoneypotInput($honeypotInput, $submittedTimestamp): void {
+        $enableHoneypotInput = getConfigData("EnableHoneypotInput");
+        if (strtolower($enableHoneypotInput) !== "yes") {
+            return;
+        }
+
+        // Check if the honeypot field is filled (indicating bot activity)
+        if (!empty($honeypotInput)) {
+            blockAndLogIPSpam("Honeypot field filled");
+            return;
+        }
+
+        // Validate the timestamp
+        $currentTime = time();
+        $submittedTimestamp = intval($submittedTimestamp);
+        $minSubmissionTime = 2; // Minimum allowed time in seconds
+
+        //check if form filled too quickly by being less than min allowed time or not being able to set before subission
+        if (($currentTime - $submittedTimestamp) < $minSubmissionTime || $submittedTimestamp === 0) {
+            blockAndLogIPSpam("Form submitted too quickly");
+            return;
+        }
+    }
+}
+
+/**
+ * Checks if any of the blocked paths exist in the given URL.
+ *
+ * This version avoids false positives by matching full path segments
+ * instead of doing loose substring matching.
+ *
+ * @param string $url The URL to check.
+ * @return bool True if the URL contains a blocked path, false otherwise.
+ */
+if (!function_exists('isBlockedRoute')) {
+    function isBlockedRoute(string $url): bool
+    {
+        $black_listed_paths = [
+            "wp-settings.php", "wp-login.php", "setup-config.php", "wp-admin/", "wordpress/", //Wordpress files
+            ".env", ".git/", ".svn/",  // Sensitive directories/files
+            "config.php", "configuration.php", "db.php", "database.php", // Common config files
+            "admin/login", "administrator/login", "cpanel/", // Common admin/login paths
+            "shell/", "r57shell/", "cmd.php", "backdoor.php", // Known backdoor/shell scripts
+            "phpinfo.php",  // Information disclosure risk
+            "eval()", "assert()", "base64_decode(", // Attempted code injection (can be part of URL)
+            "../../", "..\\",  // Directory traversal attempts
+            "etc/passwd", "/etc/passwd",  // Access to system files
+            "proc/self/environ", "/proc/self/environ", // Access to environment variables
+            "error_log", "access_log", // Log files (potentially contain sensitive info)
+            "server-status", "server-info", // Apache server status/info pages
+            "test.php", "debug.php", // Common test/debug files that might be left exposed
+            "install.php", "upgrade.php", // Installation/upgrade scripts (shouldn't be accessible)
+            "xmlrpc.php", // XML-RPC (can be exploited)
+            "composer.json", "package.json", // Information about project dependencies
+            ".sql", "sql_dump", "database_dump", "db_backup", "backup.sql.gz", "backup.sql.zip", "backup.sql.tar", // SQL paths
+            "cfide/administrator" //other
+        ];
+
+        
+
+        // Extract path
+        $url_path = parse_url($url, PHP_URL_PATH);
+        if ($url_path === null) {
+            $url_path = $url;
+        }
+
+        // Normalize
+        $url_path = trim(strtolower($url_path), '/');
+
+        // Break into segments
+        $segments = explode('/', $url_path);
+
+        foreach ($black_listed_paths as $blocked_path) {
+            $blocked = strtolower(trim($blocked_path, '/'));
+
+            // Handle multi-level paths like "admin/login"
+            if (str_contains($blocked, '/')) {
+                if (str_contains($url_path, $blocked)) {
+                    return true;
+                }
+                continue;
+            }
+
+            // Match exact segment (prevents "bombshell" issue)
+            if (in_array($blocked, $segments, true)) {
+                return true;
+            }
+
+            // Match file endings (e.g., config.php, .env)
+            foreach ($segments as $segment) {
+                if ($segment === $blocked || str_ends_with($segment, $blocked)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+}
+
+/**
+ * Adds a blocked IP address to the database.
+ *
+ * @param {string} $ip_address The IP address to block.
+ * @param {string} $url The URL where the IP address was blocked.
+ * @param {string} $reason The reason for blocking the IP address.
+ * @returns {boolean} True on success.
+ */
+if(!function_exists('addBlockedIPAdress'))
+{
+    function addBlockedIPAdress($ipAddress, $country, $url, $blockEndTime, $reason)
+    {
+        if (env('ENABLE_IP_BLOCKING') !== true) {
+            return;
+        }
+
+        $tableNameBlocked = "blocked_ips";
+        $tableNameWhitelisted  = "whitelisted_ips";
+        $newBlackListData = [
+            'blocked_ip_id' =>  getGUID(),
+            'ip_address' => $ipAddress,
+            'country' => $country,
+            'block_start_time' => date('Y-m-d H:i:s'),
+            'block_end_time' => $blockEndTime,
+            'reason' => $reason,
+            'notes' => null,
+            'page_visited_url' => $url
+        ];
+
+        $ipExistsInBlockedIps = recordExists($tableNameBlocked, 'ip_address', $newBlackListData["ip_address"]);
+        $ipExistsInWhitelistedIps = recordExists($tableNameWhitelisted, 'ip_address', $newBlackListData["ip_address"]);
+        if (!$ipExistsInBlockedIps && !$ipExistsInWhitelistedIps) {
+            addRecord($tableNameBlocked, $newBlackListData);
+        }
+        
+        return true;
+    }
+}
+
+
+/**
+ * Checks if an IP address is blocked.
+ *
+ * @param {string} $ip_address The IP address to check.
+ * @returns {boolean} True if the IP address is blocked, false otherwise.
+ */
+if (!function_exists('isBlockedIP')) {
+    function isBlockedIP($ipAddress) {
+        $tableName = "blocked_ips";
+        $db = \Config\Database::connect();
+
+        $builder = $db->table($tableName); 
+
+        $builder->where('ip_address', $ipAddress);
+        $query = $builder->get();
+
+        if ($query->getNumRows() > 0) {
+            $row = $query->getRow();
+
+            // Check if the block is indefinite or not expired.
+            if ($row->block_end_time === null || strtotime($row->block_end_time) > time()) {
+                return true;
+            } else {
+                $builder->where('id', $row->id);
+                $builder->delete();
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+}
+
+/**
+ * Generates a hidden honeypot input field and a timestamp input field.
+ * This includes a random class for the honeypot field and a hidden timestamp field.
+ *
+ * @returns {string} The HTML for the honeypot and timestamp input fields.
+ */
+if (!function_exists('getHoneypotInput')) {
+    function getHoneypotInput(): string {
+        $enableHoneypotInput = getConfigData("EnableHoneypotInput");
+        if (strtolower($enableHoneypotInput) !== "yes") {
+            return "";
+        }
+        // Add a random class name to make it harder for bots to identify
+        $randomClass = 'field_' . bin2hex(random_bytes(8));
+        $honeypotKey = getConfigData("HoneypotKey");
+        $timestampKey = getConfigData("TimestampKey");
+
+        // Generate the honeypot input
+        $honeypotInput = '<input type="hidden" name="' . $honeypotKey . '" ' .
+            'id="' . $honeypotKey . '" ' .
+            'class="' . $randomClass . '" ' .
+            'value="" ' .
+            'autocomplete="off" ' .
+            'tabindex="-1" ' .
+            'style="position:absolute !important;width:1px !important;height:1px !important;padding:0 !important;margin:-1px !important;overflow:hidden !important;clip:rect(0,0,0,0) !important;white-space:nowrap !important;border:0 !important;">';
+
+        // Generate the timestamp input
+        $timestampInput = '<input type="hidden" name="' . $timestampKey . '" ' .
+            'id="' . $timestampKey . '" ' .
+            'value="' . time() . '">';
+
+        return $honeypotInput . $timestampInput;
+    }
+}
+
+/**
+ * Render Captcha widget if enabled.
+ *
+ * @return void
+ */
+if (!function_exists('renderCaptcha')) {
+    function renderCaptcha()
+    {
+        $useCaptcha = env('USE_CAPTCHA', false);
+        if (!$useCaptcha) return "";
+
+        $types = explode(',', strtolower(env('CAPTCHA_TYPE', 'recaptcha')));
+        foreach ($types as $type) {
+            if ($type === 'recaptcha') {
+                // Google reCAPTCHA v3 (invisible, auto-token)
+                $siteKey = env('RECAPTCHA_SITE_KEY');
+                echo '<script src="https://www.google.com/recaptcha/api.js?render='.$siteKey.'"></script>';
+                echo '<script>
+                    grecaptcha.ready(function() {
+                        grecaptcha.execute("'.$siteKey.'", {action: "submit"}).then(function(token) {
+                            var recaptchaResponse = document.getElementById("g-recaptcha-response");
+                            if (recaptchaResponse) recaptchaResponse.value = token;
+                            else {
+                                var input = document.createElement("input");
+                                input.type = "hidden";
+                                input.id = "g-recaptcha-response";
+                                input.name = "g-recaptcha-response";
+                                input.value = token;
+                                document.forms[0].appendChild(input);
+                            }
+                        });
+                    });
+                </script>';
+            }
+            elseif ($type === 'hcaptcha') {
+                // hCaptcha (visible)
+                $siteKey = env('HCAPTCHA_SITE_KEY');
+                echo '<script src="https://hcaptcha.com/1/api.js" async defer></script>';
+                echo '<div class="h-captcha" data-sitekey="'.$siteKey.'"></div>';
+            }
+            elseif ($type === 'cloudflare') {
+                // Cloudflare Turnstile (visible, nice UX)
+                $siteKey = env('TURNSTILE_SITE_KEY');
+                echo '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>';
+                echo '<div class="cf-turnstile" data-sitekey="'.$siteKey.'"></div>';
+            }
+            elseif ($type === 'gregwar') {
+                // Get difficulty level from environment
+                $difficulty = strtolower(env('GREGWAR_DIFFICULTY', 'easy'));
+                
+                // Generate Gregwar CAPTCHA image with configurable difficulty
+                $builder = new \Gregwar\Captcha\CaptchaBuilder;
+                
+                // Configure based on difficulty
+                switch ($difficulty) {
+                    case 'hard':
+                        // Hard: Maximum security, harder to read
+                        $builder->setBackgroundColor(255, 255, 255);
+                        $builder->setMaxAngle(25);                    // More angled text
+                        $builder->setMaxBehindLines(3);               // More background lines
+                        $builder->setMaxFrontLines(3);                // More foreground lines  
+                        $builder->setDistortion(true);                // Enable distortion
+                        $builder->setInterpolation(true);             // Enable interpolation
+                        $builder->setIgnoreAllEffects(false);         // Enable all effects
+                        $width = 180;
+                        $height = 50;
+                        break;
+                        
+                    case 'medium':
+                        // Medium: Balanced security and readability
+                        $builder->setBackgroundColor(255, 255, 255);
+                        $builder->setMaxAngle(15);                    // Moderate text angle
+                        $builder->setMaxBehindLines(2);               // Some background lines
+                        $builder->setMaxFrontLines(2);                // Some foreground lines  
+                        $builder->setDistortion(true);                // Light distortion
+                        $builder->setInterpolation(false);            // No interpolation
+                        $builder->setIgnoreAllEffects(false);         // Some effects enabled
+                        $width = 160;
+                        $height = 45;
+                        break;
+                        
+                    case 'easy':
+                    default:
+                        // Easy: Maximum readability, basic security
+                        $builder->setBackgroundColor(255, 255, 255);
+                        $builder->setMaxAngle(8);                     // Minimal text angle
+                        $builder->setMaxBehindLines(1);               // Few background lines
+                        $builder->setMaxFrontLines(1);                // Few foreground lines  
+                        $builder->setDistortion(false);               // No distortion
+                        $builder->setInterpolation(false);            // No interpolation
+                        $builder->setIgnoreAllEffects(true);          // Ignore all effects for clarity
+                        $width = 150;
+                        $height = 40;
+                        break;
+                }
+                
+                $builder->build($width, $height);
+                
+                $captchaPhrase = $builder->getPhrase();
+                session()->set('gregwar_captcha', $captchaPhrase);
+                $captcha_image = $builder->inline();
+                
+                echo '<style>
+                        .captcha-image {
+                            border: 1px solid #ddd;
+                            padding: 5px;
+                            background: #fff;
+                        }
+
+                        .gregwar-captcha-container {
+                            background: #f8f9fa;
+                            padding: 15px;
+                            border-radius: 5px;
+                            border: 1px solid #e9ecef;
+                        }
+
+                        .gregwar-form-text {
+                            font-size: 0.875em;
+                            color: #6c757d;
+                            margin-top: 0.25rem;
+                        }
+                        
+                        .difficulty-indicator {
+                            font-size: 0.75em;
+                            padding: 2px 6px;
+                            border-radius: 3px;
+                            background: #e9ecef;
+                            display: inline-block;
+                            margin-left: 5px;
+                        }
+                        
+                        .difficulty-easy { background: #d4edda; color: #155724; }
+                        .difficulty-medium { background: #fff3cd; color: #856404; }
+                        .difficulty-hard { background: #f8d7da; color: #721c24; }
+                        .form-label {
+                        text-shadow:
+                            -0.5px -0.5px 0 #000,
+                            0.51px -0.5px 0 #000,
+                            -0.5px 0.5px 0 #000,
+                            0.5px 0.5px 0 #000;
+                        }
+
+                        #gregwar_response {
+                            border: 1px solid #ced4da !important;
+                            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+                        }
+                        
+                        #gregwar_response:focus {
+                            border-color: #86b7fe !important;
+                            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.1);
+                        }
+                    </style>
+                    <div class="mb-2 gregwar-captcha-container">
+                        <label for="gregwar_response" class="form-label">
+                            Enter the text shown in the image:
+                            <span class="difficulty-indicator difficulty-' . $difficulty . '">' . ucfirst($difficulty) . '</span>
+                        </label>
+                        <div class="mb-2">
+                            <img loading="lazy" src="' . $captcha_image . '" alt="CAPTCHA" class="captcha-image border rounded">
+                        </div>
+                        <input type="text" class="form-control" id="gregwar_response" name="gregwar_response" required placeholder="Type the text you see above" autocomplete="off">
+                        <div class="gregwar-form-text">Letters are not case sensitive</div>
+                        <div class="invalid-feedback">
+                            Please enter the captcha text shown in the image
+                        </div>
+                    </div>';
+            }
+        }
+    }
+}
+
+
+/**
+ * Validate Captcha response.
+ *
+ * @return bool|string Returns true if CAPTCHA is valid, otherwise returns an error message.
+ */
+function validateCaptcha($returnUrl = null)
+{
+    $useCaptcha = env('USE_CAPTCHA', false);
+    if (!$useCaptcha) return true;
+
+    $types = explode(',', strtolower(env('CAPTCHA_TYPE', 'recaptcha')));
+
+    foreach ($types as $type) {
+        if ($type === 'recaptcha' && !empty($_POST['g-recaptcha-response'])) {
+            $secret = env('RECAPTCHA_SECRET');
+            $response = $_POST['g-recaptcha-response'];
+            $verify = file_get_contents('https://www.google.com/recaptcha/api/siteverify?secret='.$secret.'&response='.$response);
+            $responseData = json_decode($verify);
+            if (!$responseData->success || $responseData->score < 0.5) {
+                return 'Google reCAPTCHA validation failed. Please try again.';
+            }
+        }
+        elseif ($type === 'hcaptcha' && !empty($_POST['h-captcha-response'])) {
+            $secret = env('HCAPTCHA_SECRET');
+            $response = $_POST['h-captcha-response'];
+            $post_data = http_build_query([
+                'secret' => $secret,
+                'response' => $response
+            ]);
+            $opts = ['http'=>['method'=>"POST", 'header'=>"Content-type: application/x-www-form-urlencoded", 'content'=>$post_data]];
+            $context = stream_context_create($opts);
+            $verify = file_get_contents('https://hcaptcha.com/siteverify', false, $context);
+            $responseData = json_decode($verify);
+            if (empty($responseData->success)) {
+                return 'hCaptcha validation failed.';
+            }
+        }
+        elseif ($type === 'cloudflare' && !empty($_POST['cf-turnstile-response'])) {
+            $secret = env('TURNSTILE_SECRET');
+            $response = $_POST['cf-turnstile-response'];
+            $ch = curl_init('https://challenges.cloudflare.com/turnstile/v0/siteverify');
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+                'secret' => $secret,
+                'response' => $response,
+                'remoteip' => $_SERVER['REMOTE_ADDR'] ?? null
+            ]));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $res = curl_exec($ch);
+            curl_close($ch);
+            $responseData = json_decode($res);
+            if (empty($responseData->success)) {
+                return 'Cloudflare Turnstile verification failed.';
+            }
+        }
+        elseif ($type === 'gregwar' && !empty($_POST['gregwar_response'])) {
+            $userInput = $_POST['gregwar_response'];
+            $storedPhrase = session('gregwar_captcha');
+            
+            // Clear the session captcha after validation (one-time use)
+            session()->remove('gregwar_captcha');
+            
+            if (empty($storedPhrase) || strtolower(trim($userInput)) !== strtolower(trim($storedPhrase))) {
+                return 'Captcha validation failed. Please try again.';
+            }
+            return true;
+        }
+    }
+
+    // If we get here and Gregwar is the only CAPTCHA type, check if input was provided
+    if (in_array('gregwar', $types) && empty($_POST['gregwar_response'])) {
+        return 'Please complete the captcha.';
+    }
+
+    return 'Captcha validation required.';
+}
+
+
+/**
+ * Blocks the IP address and logs the activity.
+ *
+ * @param {string} $reason The reason for blocking the IP.
+ * @returns {void}
+ */
+if (!function_exists('blockAndLogIPSpam')) {
+    function blockAndLogIPSpam($reason): void {
+        if (env('ENABLE_IP_BLOCKING') !== true) {
+            return;
+        }
+
+        $ipAddress = getDeviceIP();
+        $activityBy = $ipAddress;
+        $currentUrl = current_url();
+        $country = getCountry();
+        $blockEndTime = date('Y-m-d H:i:s', strtotime(getConfigData("BlockedIPSuspensionPeriod")));
+
+        // Add to blocked IPs
+        addBlockedIPAdress($ipAddress, $country, $currentUrl, $blockEndTime, ActivityTypes::BLOCKED_IP_SPAMMING);
+
+        // Log the activity
+        logActivity($activityBy, ActivityTypes::BLOCKED_IP_SPAMMING, $reason . ' with IP: ' . $ipAddress, $currentUrl);
+
+        // Return a normal-looking 403 response
+        header('HTTP/1.1 403 Forbidden');
+
+        // If it's an AJAX request, return JSON
+        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Access denied']);
+            exit();
+        }
+
+        echo 'Your IP address has been blocked.';
+        exit();
+    }
+}

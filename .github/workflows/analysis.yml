@@ -1,0 +1,76 @@
+name: 🔍 Code Quality Analysis (Smells / Tests / SonarCloud)
+
+# Separate from the FTP deploy workflow (main.yaml). Runs analysis only.
+on:
+  push:
+    branches: [main, develop, refactor/**]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  analysis:
+    name: 🧪 Static analysis + tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 Checkout (full history for SonarCloud)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐘 Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl, gd, zip, mbstring, sqlite3, mysqli
+          tools: composer, phpmd, phpunit
+          coverage: xdebug
+
+      - name: 📦 Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      # --- Smell detector #1: PHPMD (long method, long param list, large class, complexity) ---
+      # continue-on-error: we WANT it to REPORT smells, not fail the build.
+      - name: 🟠 PHPMD (code size / design rules)
+        continue-on-error: true
+        run: |
+          phpmd app/Controllers,app/Helpers text \
+            codesize,design,cleancode,unusedcode \
+            --reportfile phpmd-report.txt || true
+          echo "----- PHPMD report -----"
+          cat phpmd-report.txt || true
+
+      # --- Smell detector #2: jscpd (duplicate code) ---
+      - name: 🟣 jscpd (duplicate-code detection)
+        continue-on-error: true
+        run: |
+          npx --yes jscpd app \
+            --ignore "app/Views/**" \
+            --reporters console,html \
+            --output jscpd-report \
+            --min-lines 30 --min-tokens 100 || true
+
+      # --- Behaviour-preservation tests (SQLite in-memory test DB) ---
+      - name: ✅ PHPUnit
+        continue-on-error: true
+        run: vendor/bin/phpunit --colors=never || true
+
+      # --- SonarCloud scan (primary detection + metrics) ---
+      # Requires repo secret SONAR_TOKEN (Settings → Secrets → Actions).
+      - name: 🔵 SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+      # --- Keep reports as downloadable artifacts (for B3 screenshots) ---
+      - name: 📤 Upload analysis reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-reports
+          path: |
+            phpmd-report.txt
+            jscpd-report/
+            build/logs/
+          if-no-files-found: ignore
