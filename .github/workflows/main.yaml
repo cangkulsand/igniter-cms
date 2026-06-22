@@ -6,6 +6,9 @@ jobs:
   web-deploy:
     name: 🎉 Deploy
     runs-on: ubuntu-latest
+    # Only deploy from the original maintainer's repo. On forks (no FTP secrets)
+    # this job is skipped instead of failing.
+    if: github.repository == 'akassama/igniter-cms'
     steps:
       - name: 🚚 Get latest code
         uses: actions/checkout@v3

@@ -35,7 +35,7 @@ jobs:
         continue-on-error: true
         run: |
           phpmd app/Controllers,app/Helpers text \
-            codesize,design,cleancode,unusedcode \
+            phpmd-ruleset.xml \
             --reportfile phpmd-report.txt || true
           echo "----- PHPMD report -----"
           cat phpmd-report.txt || true
@@ -46,9 +46,9 @@ jobs:
         run: |
           npx --yes jscpd app \
             --ignore "app/Views/**" \
-            --reporters console,html \
+            --reporters console,html,json \
             --output jscpd-report \
-            --min-lines 30 --min-tokens 100 || true
+            --min-lines 10 --min-tokens 50 || true
 
       # --- Behaviour-preservation tests (SQLite in-memory test DB) ---
       - name: ✅ PHPUnit
