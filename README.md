@@ -10,57 +10,122 @@ Igniter CMS is a light but powerful open source Content Management System built 
 
 Visit [Documentation](https://docs.ignitercms.com/) section in the website
 
-## System Requirements & Installation
+## System Requirements
 
-1. **Requirements:**
+- PHP 8.2+ with the `zip`, `intl`, and `gd` extensions enabled
+- Composer
+- MySQL (or other supported database)
+- A web server (Apache, Nginx, etc., or PHP's built-in server)
 
-   - PHP 8.0 or higher
-   - Composer
-   - MySQL (or other supported database)
-   - Web server (Apache, Nginx, etc.)
-   - Enable `zip`, `intl` and `gd` extension in php ini
+## Installation
 
-2. **Steps:**
+The steps below describe a local setup. They use [Laragon](https://laragon.org/) on Windows as the reference environment, but the commands work on any platform where `php`, `composer`, and `mysql` are on your PATH.
 
-   - Clone the repository: `git clone https://github.com/akassama/igniter-cms`
-   - Navigate to the project folder: `cd igniter-cms`
-   - Install dependencies: `composer install`
-   - Configure Database Connection:
+> **Tip (Laragon/Windows):** Run all commands in **Laragon's Terminal** (open Laragon → **Terminal**) so `php`, `composer`, and `mysql` are available. To add PHP, right-click the Laragon tray icon → **Tools → Quick Add → PHP**. To enable extensions, right-click → **PHP → Extensions**.
 
-     - The database configuration is managed via a `.env` file. If you don't have one, make a copy of the `env` file in the root directory of your project and rename it `.env`.
-     - Add the following database configuration settings to your `.env` file, replacing the placeholder values with your actual database credentials:
+### 1. Clone the repository
 
-     ```
-     database.default.hostname = localhost
-     database.default.database = igniter_db
-     database.default.username = root
-     database.default.password =
-     database.default.DBDriver = MySQLi
-     database.default.DBPrefix =
-     database.default.port = 3306
-     ```
+```bash
+git clone https://github.com/akassama/igniter-cms.git
+cd igniter-cms
+```
 
-     Make sure to update the `hostname`, `username`, `password`, and `database` fields with your database connection details.
+### 2. Install PHP dependencies
 
-   - Create the Database: Using your database management system (e.g., PhpMyAdmin), create a new database with the same name specified in `.env`.
-   - Set Up Base URL: Set your base URL in the `.env` file. `app_baseURL = 'http://localhost/igniter-cms/'`
-   - Generate App Key: `php spark generate:key` This command will generate/update the application key `(APP_KEY)` in the `.env` file
-   - Run migrations: `php spark recreate:tables` and type `yes`.. This command will execute all available migrations, creating the necessary database tables.
-   - Start the Application
-     Ensure that your local server (e.g., Apache, Nginx) is running, then navigate to the base URL you set earlier, E.g. `https://localhost/igniter-cms`
+```bash
+composer install
+```
 
-   - Default Admin Login
+This creates the `vendor/` folder. The final **"Generating optimized autoload files"** step scans `app/Models` and `app/Controllers` to build a class map — it can take a few seconds to ~30s (longer if antivirus scans `vendor/`). This is normal; let it finish.
 
-     You can log in using the default Admin credentials:
+Make sure `zip`, `intl`, and `gd` are enabled in your `php.ini` (Laragon → Menu → PHP → Extensions).
 
-     - Email: admin@example.com
-     - Password: Admin@1
+### 3. Create your `.env` file
 
-     To modify the default Admin login, go to the migration file located at `app/Database/Migrations/2024-08-27-210112_Users.php` and update the `$data[]` array accordingly.
+Copy the example `env` file to `.env`:
 
-3. **Permissions:** Ensure `writable` and `public/uploads` directories are writable by the web server.
+```bash
+copy env .env   # Windows
+# cp env .env   # macOS / Linux
+```
 
-4. **Email Configuration:** To enable email functionality, you need to configure your SMTP in `.env`
+Then edit `.env` and set these values (Laragon's default MySQL password is usually empty):
+
+```ini
+CI_ENVIRONMENT = development
+
+# Use whichever base URL matches your setup:
+app.baseURL = 'http://localhost:8080/'
+#app.baseURL = 'http://igniter-cms.test/'
+#app.baseURL = 'http://localhost:8080/igniter-cms/'
+
+database.default.hostname = localhost
+database.default.database = igniter_cms_db
+database.default.username = root
+database.default.password =
+database.default.DBDriver = MySQLi
+database.default.port = 3306
+```
+
+**Base URL notes:**
+
+- With Laragon auto-vhosts, the site is `http://igniter-cms.test`.
+- Without vhosts, use `app.baseURL = 'http://localhost/igniter-cms/public/'`.
+
+### 4. Create the database
+
+Create an empty database named `igniter_cms_db` (via Laragon → Database, HeidiSQL, or phpMyAdmin). Or via CLI:
+
+```bash
+mysql -u root -e "CREATE DATABASE igniter_cms_db CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
+```
+
+### 5. Generate the app key
+
+```bash
+php spark generate:key
+```
+
+This sets/updates `APP_KEY` in your `.env`.
+
+### 6. Create the tables
+
+Run the migrations (recommended):
+
+```bash
+php spark recreate:tables
+```
+
+Type `yes` when prompted. This executes all available migrations and creates the necessary tables.
+
+> **Alternative:** this repo ships a SQL dump at `install/database.sql` you can import instead — but migrations are the documented path.
+
+### 7. Start the app
+
+With your web server and MySQL running, open the base URL you configured, e.g. `http://igniter-cms.test`.
+
+Or use CodeIgniter's built-in server for quick testing:
+
+```bash
+php spark serve
+```
+
+→ `http://localhost:8080`
+
+### 8. Log in
+
+Default admin credentials:
+
+- **Email:** `admin@example.com`
+- **Password:** `Admin@1`
+
+To change the defaults, edit the migration at `app/Database/Migrations/2024-08-27-210112_Users.php` and update the `$data[]` array.
+
+## Notes
+
+- **Permissions:** ensure `writable/` and `public/uploads/` are writable by the web server.
+- **Email:** configure SMTP in `.env` (the `email.*` settings) to enable mail.
+- **Captcha / OAuth / AI:** optional integrations are configured in `.env` (disabled by default).
 
 ## Demo
 
