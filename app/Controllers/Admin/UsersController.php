@@ -4,6 +4,7 @@ namespace App\Controllers\Admin;
 
 use App\Constants\ActivityTypes;
 use App\Controllers\BaseController;
+use App\DataObjects\UserData;
 use App\Models\UsersModel;
 
 /**
@@ -61,22 +62,7 @@ class UsersController extends BaseController
         $actionUrl = $this->request->getUri()->getPath();
         $previousData = null;
         // If validation passes, create the user
-        $userData = [
-            'first_name' => $this->request->getPost('first_name'),
-            'last_name' => $this->request->getPost('last_name'),
-            'username' => $this->request->getPost('username'),
-            'email' => $this->request->getPost('email'),
-            'password' => password_hash($this->request->getPost('password'), PASSWORD_DEFAULT),
-            'status' => $this->request->getPost('status'),
-            'role' => $this->request->getPost('role'),
-            'profile_picture' => $this->request->getPost('profile_picture') ?? getDefaultProfileImagePath(),
-            'twitter_link' => $this->request->getPost('twitter_link'),
-            'facebook_link' => $this->request->getPost('facebook_link'),
-            'instagram_link' => $this->request->getPost('instagram_link'),
-            'linkedin_link' => $this->request->getPost('linkedin_link'),
-            'about_summary' => $this->request->getPost('about_summary'),
-            'password_change_required' => $this->request->getPost('password_change_required') ?? false,
-        ];
+        $userData = UserData::fromRequest($this->request, true)->toCreateArray();
         $cleanedUserData = $userData;
         unset($cleanedUserData['password']);
 
@@ -154,19 +140,7 @@ class UsersController extends BaseController
 
             $db = \Config\Database::connect();
             $builder = $db->table('users');
-            $data = [
-                'first_name' => $this->request->getPost('first_name'),
-                'last_name'  => $this->request->getPost('last_name'),
-                'status'  => $this->request->getPost('status'),
-                'role'  => $this->request->getPost('role'),
-                'profile_picture' => $this->request->getPost('profile_picture') ?? getDefaultProfileImagePath(),
-                'twitter_link' => $this->request->getPost('twitter_link'),
-                'facebook_link' => $this->request->getPost('facebook_link'),
-                'instagram_link' => $this->request->getPost('instagram_link'),
-                'linkedin_link' => $this->request->getPost('linkedin_link'),
-                'about_summary' => $this->request->getPost('about_summary'),
-                'password_change_required' => $this->request->getPost('password_change_required') ?? false,
-            ];
+            $data = UserData::fromRequest($this->request)->toUpdateArray();
 
             $builder->where('user_id', $userId);
             $builder->update($data);
