@@ -1,0 +1,362 @@
+        <style>
+        .sr-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            font-family: system-ui, -apple-system, sans-serif;
+            color: #222222;
+        }
+        .sr-grid {
+            display: grid;
+            gap: 2rem;
+        }
+        .sr-card {
+            background: #ffffff;
+            border: 1px solid #22222220;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+        .sr-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        .sr-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        .sr-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #111111;
+            margin: 0 0 1rem 0;
+        }
+        .sr-subtitle {
+            font-size: 1.25rem;
+            color: #222222;
+            margin: 0;
+        }
+        .sr-section {
+            margin-bottom: 3rem;
+        }
+        .sr-section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #111111;
+            margin: 0 0 1.5rem 0;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #22222230;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sr-list {
+            display: grid;
+            gap: 1rem;
+        }
+        .sr-list-item {
+            display: block;
+            background: #ffffff;
+            border: 1px solid #22222220;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s ease;
+        }
+        .sr-list-item:hover {
+            border-color: #222222;
+            background: #f5f5f5;
+            transform: translateX(4px);
+        }
+        .sr-item-header {
+            display: flex;
+            justify-content: between;
+            align-items: start;
+            margin-bottom: 0.75rem;
+            gap: 1rem;
+        }
+        .sr-item-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #111111;
+            margin: 0;
+            flex: 1;
+        }
+        .sr-badge {
+            background: #e91e63;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .sr-item-desc {
+            color: #222222;
+            margin: 0 0 0.5rem 0;
+            line-height: 1.5;
+        }
+        .sr-item-url {
+            color: #222222;
+            font-size: 0.875rem;
+            margin: 0;
+        }
+        .sr-blog-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        .sr-blog-card {
+            background: #ffffff;
+            border: 1px solid #22222220;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .sr-blog-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        .sr-image-wrapper {
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+            background: #22222210;
+            position: relative;
+        }
+        .sr-blog-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+        .sr-blog-card:hover .sr-blog-image {
+            transform: scale(1.05);
+        }
+        .sr-blog-content {
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .sr-blog-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .sr-blog-category {
+            background: #222222;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+        .sr-blog-date {
+            color: #222222;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .sr-blog-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #111111;
+            margin: 0 0 0.75rem 0;
+            line-height: 1.4;
+        }
+        .sr-blog-excerpt {
+            color: #222222;
+            margin: 0 0 1.25rem 0;
+            line-height: 1.5;
+            flex: 1;
+        }
+        .sr-button {
+            display: inline-block;
+            background: #222222;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            align-self: flex-start;
+        }
+        .sr-button:hover {
+            background: #e91e63;
+            transform: translateY(-1px);
+        }
+        .sr-button-outline {
+            background: transparent;
+            border: 2px solid #222222;
+            color: #222222;
+        }
+        .sr-button-outline:hover {
+            background: #222222;
+            color: white;
+        }
+        .sr-form {
+            width: 100%;
+        }
+        .sr-input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #22222230;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.3s ease;
+        }
+        .sr-input:focus {
+            outline: none;
+            border-color: #222222;
+        }
+        .sr-icon {
+            font-size: 1.2em;
+            line-height: 1;
+        }
+        .sr-icon-large {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        .sr-center {
+            text-align: center;
+        }
+        .sr-count {
+            color: #e91e63;
+            font-weight: 600;
+        }
+        .sr-highlight {
+            color: #e91e63;
+            font-weight: 600;
+        }
+        
+        /* Responsive adjustment for mobile */
+        @media (max-width: 768px) {
+            .sr-image-wrapper {
+                height: 180px;
+            }
+        }
+        </style>
+
+        <div class="sr-container">
+                            <!-- Search Header -->
+                <div class="sr-header">
+                    <h1 class="sr-title">Search Results for "<span class="sr-highlight">php</span>"</h1>
+                    <p class="sr-subtitle"><span class="sr-count">4</span> result(s) found</p>
+                </div>
+
+                <!-- Pages Results -->
+                                    <div class="sr-section">
+                        <h2 class="sr-section-title">
+                            <span class="sr-icon"><i class="ri-file-line"></i></span>
+                            Pages
+                        </h2>
+                        <div class="sr-list">
+                                                            <a href="http://localhost/igniter-cms/about-us" class="sr-list-item">
+                                    <div class="sr-item-header">
+                                        <h3 class="sr-item-title">About Us</h3>
+                                        <span class="sr-badge">Page</span>
+                                    </div>
+                                    <p class="sr-item-desc">
+                                        Learn about our company and our mission.                                    </p>
+                                    <p class="sr-item-url">http://localhost/igniter-cms/about-us</p>
+                                </a>
+                                                            <a href="http://localhost/igniter-cms/contact" class="sr-list-item">
+                                    <div class="sr-item-header">
+                                        <h3 class="sr-item-title">Contact</h3>
+                                        <span class="sr-badge">Page</span>
+                                    </div>
+                                    <p class="sr-item-desc">
+                                        Learn more about this page.                                    </p>
+                                    <p class="sr-item-url">http://localhost/igniter-cms/contact</p>
+                                </a>
+                                                    </div>
+                    </div>
+                
+                <!-- Blogs Results -->
+                                    <div class="sr-section">
+                        <h2 class="sr-section-title">
+                            <span class="sr-icon"><i class="ri-newspaper-line"></i></span>
+                            Blog Posts
+                        </h2>
+                        <div class="sr-blog-grid">
+                                                            <div class="sr-blog-card">
+                                    <div class="sr-image-wrapper">
+                                        <a href="http://localhost/igniter-cms/blog/intro-to-php">
+                                            <img src="http://localhost/igniter-cms/uploads/php.jpg"
+                                                 class="sr-blog-image"
+                                                 alt="Intro to PHP"
+                                                 loading="lazy"
+                                                 onerror="this.src='public/back-end/assets/img/default_image_placeholder.png'">
+                                        </a>
+                                    </div>
+                                    <div class="sr-blog-content">
+                                        <div class="sr-blog-meta">
+                                            <span class="sr-blog-category">
+                                                Uncategorized                                            </span>
+                                            <span class="sr-blog-date">
+                                                <span class="sr-icon"><i class="ri-calendar-line"></i></span>
+                                                Jan 15, 2024                                            </span>
+                                        </div>
+                                        <h3 class="sr-blog-title">Intro to PHP</h3>
+                                        <p class="sr-blog-excerpt">
+                                            A beginner friendly introduction to PHP programming.                                        </p>
+                                        <a href="http://localhost/igniter-cms/blog/intro-to-php" class="sr-button sr-button-outline">Read More</a>
+                                    </div>
+                                </div>
+                                                            <div class="sr-blog-card">
+                                    <div class="sr-image-wrapper">
+                                        <a href="http://localhost/igniter-cms/blog/php-8-features">
+                                            <img src="http://localhost/igniter-cms/"
+                                                 class="sr-blog-image"
+                                                 alt="PHP 8 Features"
+                                                 loading="lazy"
+                                                 onerror="this.src='public/back-end/assets/img/default_image_placeholder.png'">
+                                        </a>
+                                    </div>
+                                    <div class="sr-blog-content">
+                                        <div class="sr-blog-meta">
+                                            <span class="sr-blog-category">
+                                                Uncategorized                                            </span>
+                                            <span class="sr-blog-date">
+                                                <span class="sr-icon"><i class="ri-calendar-line"></i></span>
+                                                Feb 20, 2024                                            </span>
+                                        </div>
+                                        <h3 class="sr-blog-title">PHP 8 Features</h3>
+                                        <p class="sr-blog-excerpt">
+                                            A deep dive into the new features shipped with PHP 8.                                        </p>
+                                        <a href="http://localhost/igniter-cms/blog/php-8-features" class="sr-button sr-button-outline">Read More</a>
+                                    </div>
+                                </div>
+                                                    </div>
+                    </div>
+                
+                <!-- Feedback Section -->
+                <div class="sr-section">
+                    <div class="sr-card sr-center">
+                        <span class="sr-icon sr-icon-large"><i class="ri-search-line"></i></span>
+                        <h2 style="font-size: 1.75rem; margin: 0 0 1rem 0; color: #111111;">Not what you were looking for?</h2>
+                        <p style="margin: 0 0 2rem 0; color: #222222;">Help us improve your search experience.</p>
+                        <form action="http://localhost/igniter-cms/search" method="get" class="sr-form">
+                            <input type="text" name="q" class="sr-input" placeholder="Try a different search term" value="php">
+                            <button type="submit" class="sr-button">Search Again</button>
+                        </form>
+                    </div>
+                </div>
+
+                    </div>
+        
