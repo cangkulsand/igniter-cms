@@ -207,58 +207,58 @@ if (isFeatureEnabled('FEATURE_BACK_END')) {
         #####============================= ADMIN MODULE =============================#####
         //ADMIN
         $routes->get('admin', 'AdminController::index', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/users', 'AdminController::users', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/users/new-user', 'AdminController::newUser', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/users/new-user', 'AdminController::addUser');
-        $routes->get('admin/users/edit-user/(:any)', 'AdminController::editUser/$1', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/users/edit-user', 'AdminController::updateUser');
-        $routes->get('admin/users/view-user/(:any)', 'AdminController::viewUser/$1', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/users', 'Admin\UsersController::users', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/users/new-user', 'Admin\UsersController::newUser', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/users/new-user', 'Admin\UsersController::addUser');
+        $routes->get('admin/users/edit-user/(:any)', 'Admin\UsersController::editUser/$1', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/users/edit-user', 'Admin\UsersController::updateUser');
+        $routes->get('admin/users/view-user/(:any)', 'Admin\UsersController::viewUser/$1', ['filter' => 'adminRoleFilter']);
 
         #ACTIVITY LOGS
-        $routes->get('admin/activity-logs', 'AdminController::activityLogs', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/activity-logs/view-activity/(:any)', 'AdminController::viewActivity/$1');
-        $routes->get('admin/logs', 'AdminController::viewLogFiles', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/logs/view-log/(:any)', 'AdminController::viewLogData/$1');
-        
+        $routes->get('admin/activity-logs', 'Admin\ActivityController::activityLogs', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/activity-logs/view-activity/(:any)', 'Admin\ActivityController::viewActivity/$1');
+        $routes->get('admin/logs', 'Admin\ActivityController::viewLogFiles', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/logs/view-log/(:any)', 'Admin\ActivityController::viewLogData/$1');
+
         #VISIT STATS
-        $routes->get('admin/visit-stats', 'AdminController::viewStats', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/visit-stats/view-stat/(:any)', 'AdminController::viewStat/$1');
-        $routes->get('admin/blocked-ips', 'AdminController::blockedIps', ['filter' => 'adminRoleFilter']);
-        
+        $routes->get('admin/visit-stats', 'Admin\ActivityController::viewStats', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/visit-stats/view-stat/(:any)', 'Admin\ActivityController::viewStat/$1');
+        $routes->get('admin/blocked-ips', 'Admin\IpAccessController::blockedIps', ['filter' => 'adminRoleFilter']);
+
         #IP MANAGEMENT
-        $routes->get('admin/blocked-ips/new-blocked-ip', 'AdminController::newBlockedIP', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/blocked-ips/new-blocked-ip', 'AdminController::addBlockedIP');
-        $routes->get('admin/whitelisted-ips', 'AdminController::whitelistedIps', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/whitelisted-ips/new-whitelisted-ip', 'AdminController::newWhitelistedIP', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/whitelisted-ips/new-whitelisted-ip', 'AdminController::addWhitelistedIP');
-        
+        $routes->get('admin/blocked-ips/new-blocked-ip', 'Admin\IpAccessController::newBlockedIP', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/blocked-ips/new-blocked-ip', 'Admin\IpAccessController::addBlockedIP');
+        $routes->get('admin/whitelisted-ips', 'Admin\IpAccessController::whitelistedIps', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/whitelisted-ips/new-whitelisted-ip', 'Admin\IpAccessController::newWhitelistedIP', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/whitelisted-ips/new-whitelisted-ip', 'Admin\IpAccessController::addWhitelistedIP');
+
         #CONFIGURATIONS
-        $routes->get('admin/configurations', 'AdminController::configurations', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/configurations/new-config', 'AdminController::newConfiguration', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/configurations/new-config', 'AdminController::addConfiguration');
-        $routes->get('admin/configurations/view-config/(:any)', 'AdminController::viewConfiguration/$1', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/configurations/edit-config/(:any)', 'AdminController::editConfiguration/$1', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/configurations/edit-config', 'AdminController::updateConfiguration');
-        
+        $routes->get('admin/configurations', 'Admin\ConfigurationsController::configurations', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/configurations/new-config', 'Admin\ConfigurationsController::newConfiguration', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/configurations/new-config', 'Admin\ConfigurationsController::addConfiguration');
+        $routes->get('admin/configurations/view-config/(:any)', 'Admin\ConfigurationsController::viewConfiguration/$1', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/configurations/edit-config/(:any)', 'Admin\ConfigurationsController::editConfiguration/$1', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/configurations/edit-config', 'Admin\ConfigurationsController::updateConfiguration');
+
         #CODES
-        $routes->get('admin/codes', 'AdminController::codes', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/codes/new-code', 'AdminController::newCode', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/codes/new-code', 'AdminController::addCode');
-        $routes->get('admin/codes/edit-code/(:any)', 'AdminController::editCode/$1', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/codes/edit-code', 'AdminController::updateCode');
-        
+        $routes->get('admin/codes', 'Admin\CodesController::codes', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/codes/new-code', 'Admin\CodesController::newCode', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/codes/new-code', 'Admin\CodesController::addCode');
+        $routes->get('admin/codes/edit-code/(:any)', 'Admin\CodesController::editCode/$1', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/codes/edit-code', 'Admin\CodesController::updateCode');
+
         #API-KEYS
-        $routes->get('admin/api-keys', 'AdminController::apiKeys', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/api-keys/new-api-key', 'AdminController::newApiKey', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/api-keys/new-api-key', 'AdminController::addApiKey');
-        $routes->get('admin/api-keys/edit-api-key/(:any)', 'AdminController::editApiKey/$1', ['filter' => 'adminRoleFilter']);
-        $routes->post('admin/api-keys/edit-api-key', 'AdminController::updateApiKey');
-        
+        $routes->get('admin/api-keys', 'Admin\ApiKeysController::apiKeys', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/api-keys/new-api-key', 'Admin\ApiKeysController::newApiKey', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/api-keys/new-api-key', 'Admin\ApiKeysController::addApiKey');
+        $routes->get('admin/api-keys/edit-api-key/(:any)', 'Admin\ApiKeysController::editApiKey/$1', ['filter' => 'adminRoleFilter']);
+        $routes->post('admin/api-keys/edit-api-key', 'Admin\ApiKeysController::updateApiKey');
+
         #BACKUPS
-        $routes->get('admin/backups', 'AdminController::backups', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/backups/generate-db-backup', 'AdminController::generateDbBackup', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/backups/download-db/(:any)', 'AdminController::downloadDbBackup/$1', ['filter' => 'adminRoleFilter']);
-        $routes->get('admin/backups/download-public-folder-backup', 'AdminController::downloadPublicFolderBackup', ['filter' => 'adminRoleFilter']);        
+        $routes->get('admin/backups', 'Admin\BackupsController::backups', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/backups/generate-db-backup', 'Admin\BackupsController::generateDbBackup', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/backups/download-db/(:any)', 'Admin\BackupsController::downloadDbBackup/$1', ['filter' => 'adminRoleFilter']);
+        $routes->get('admin/backups/download-public-folder-backup', 'Admin\BackupsController::downloadPublicFolderBackup', ['filter' => 'adminRoleFilter']);
     }
 
 
