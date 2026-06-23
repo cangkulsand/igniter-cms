@@ -72,15 +72,18 @@
 - [x] Add `.github/workflows/analysis.yml` (SonarCloud + PHPMD + jscpd + PHPUnit; separate from FTP deploy).
 - [x] Add micro-benchmark harness as a spark command: `php spark benchmark:smells` (`app/Commands/BenchmarkSmells.php`) — time + memory. *(Used a spark command instead of a bare script so app helpers + DB are available.)*
 - [x] Exclude `original-code/**` + `refactored-code/**` from the FTP deploy (`main.yaml`).
-- [ ] **Push fork to GitHub** (`git push -u igniter-cms main`).
-- [ ] **Add `SONAR_TOKEN` repo secret** (GitHub → Settings → Secrets → Actions) so the SonarCloud job authenticates.
+- [x] **Push fork to GitHub** (`git push -u igniter-cms main`) — commit `f8fcdc5`, `main` now tracks `igniter-cms/main`.
+- [x] **Add `SONAR_TOKEN` repo secret** — done by user; first analysis run triggered on push.
 
 ### Phase 1 — Baseline measurements ("before")
-- [ ] **SonarCloud scan #1** on original code → record **LOC, cyclomatic complexity, duplication %** + screenshot dashboard. *(B3 + B6 "before")*
-- [ ] **PHPMD + jscpd** run → screenshots flagging #4, #3 (cross-reference). *(B3)*
+- [x] **PHPMD + jscpd** run (CI, `analysis-reports-job1/`) — all 3 smells confirmed:
+  - #1 God Class: PHPMD ExcessiveClassLength 1254 / TooManyMethods 41 / Complexity 87 / Coupling 15
+  - #4 Long Param List: PHPMD ExcessiveParameterList — `logActivity` 8 params ("less than 6")
+  - #3 Duplicate Code: jscpd dup 0.34%→6.54%, 6 clone pairs between the two render fns; manual diff 272/394 (~69%)
+- [x] **SonarCloud scan #1** — dashboard populated; Issues (Code Smells) + Measures (LOC, Complexity, Duplications) screenshots captured. *(B3 + B6 "before")*
 - [ ] **Micro-benchmark** on `logActivity()` + render functions → record **execution time + memory**. *(B6 "before")*
-- [ ] **PHPUnit golden-master** for `renderSearchResults()` → capture current HTML snapshot (the "expected" baseline).
-- [ ] **Katalon** E2E suite recorded against original app → all green; keep screenshots. *(B5 baseline)*
+- [x] **PHPUnit golden-master** for `renderSearchResults()` + `renderFilterSearchResults()` → `tests/Helpers/RenderSearchResultsTest.php`, snapshots in `tests/_snapshots/` (no-results + with-results cases). Theme colours seeded into in-memory SQLite for determinism; `tests/**` added to `sonar.cpd.exclusions`. 3 tests green; second run compares byte-for-byte.
+- [~] **Katalon** E2E — **OPTIONAL / SKIPPED.** Rubric B5 only requires "re-run the system + test the affected feature" + a screenshot of the app running correctly after refactoring (manual is acceptable). Behaviour preservation is already covered by the PHPUnit golden master (function-level) + manual browser screenshots (feature-level). Guide kept at `katalon/KATALON_GUIDE.md` if we want the extra layer later.
 
 **Baseline artifacts to store:** Sonar screenshot, PHPMD/jscpd output, benchmark numbers, HTML snapshot, Katalon report.
 
@@ -91,7 +94,7 @@
 **Objective:** apply the 3 refactorings, prove behaviour unchanged, re-measure.
 
 ### Phase 2 — Refactor (one smell per labelled commit)
-- [ ] **#1 `AdminController` → Extract Class** (do first — biggest structural change)
+- [x] **#1 `AdminController` → Extract Class** ✅ (do first — biggest structural change). 7 controllers created under `app/Controllers/Admin/` (Users, ApiKeys, Configurations, Codes, Activity, IpAccess, Backups); `AdminController` reduced to `index()` (1,273 → 30 lines). 27 routes repointed, URLs/verbs/filters byte-identical (verified via normalized `php spark routes` diff). `php -l` clean on all 8 files; reflection confirms all classes/methods resolve; live smoke test = 302 redirects (no 500s). **Pending commit.**
   - Create `app/Controllers/Admin/` with focused controllers: `UsersController`, `ApiKeysController`, `ConfigurationsController`, `CodesController`, `ActivityController` (activity logs + log files + stats), `IpAccessController` (blocked + whitelisted IPs), `BackupsController`.
   - Move each domain's methods over **verbatim**; `AdminController` keeps only `index()` (dashboard) as a thin shell.
   - Update **only the controller name** in each `app/Config/Routes.php` line — **URL paths unchanged** (e.g. `admin/users` → `Admin\UsersController::users`).
