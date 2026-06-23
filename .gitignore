@@ -95,6 +95,17 @@ tests/coverage*
 phpunit
 
 #-------------------------
+# Katalon Studio (E2E) — local project, reports, and generated artifacts
+#-------------------------
+katalon/
+igniter-cms-e2e/
+
+#-------------------------
+# Report working files (local only) — Word drafts + lock/temp files
+#-------------------------
+answer/
+
+#-------------------------
 # Composer
 #-------------------------
 vendor/
