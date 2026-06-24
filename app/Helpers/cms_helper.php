@@ -3225,6 +3225,32 @@ if (!function_exists('loadSiteIcons')) {
 }
 
 /**
+ * Retrieves the active theme's colour set used by the search-result renderers.
+ *
+ * Extracted (Extract Method / Consolidate Duplicate Code, smell #3) from the
+ * identical theme-colour block that was repeated verbatim in
+ * renderSearchResults(), renderFilterSearchResults() and renderBlogsGrid().
+ *
+ * @return array<string,mixed> Keys: default_color, heading_color, accent_color,
+ *                             surface_color, contrast_color, background_color.
+ */
+if (!function_exists('getSearchResultThemeColors')) {
+    function getSearchResultThemeColors(): array
+    {
+        $theme = getCurrentTheme();
+
+        return [
+            'default_color'    => getThemeData($theme, "default_color"),
+            'heading_color'    => getThemeData($theme, "heading_color"),
+            'accent_color'     => getThemeData($theme, "accent_color"),
+            'surface_color'    => getThemeData($theme, "surface_color"),
+            'contrast_color'   => getThemeData($theme, "contrast_color"),
+            'background_color' => getThemeData($theme, "background_color"),
+        ];
+    }
+}
+
+/**
  * Renders posts, and pages search results in grid with theme-agnostic styling
  *
  * @param string $searchQuery search query text
@@ -3239,15 +3265,9 @@ if (!function_exists('renderSearchResults')) {
         $noResults = empty($blogsSearchResults) && empty($pagesSearchResults);
         $totalResults = (!$noResults) ? (count($blogsSearchResults ?? []) + count($pagesSearchResults ?? [])) : 0;
 
-        // Get theme colors
-        $theme = getCurrentTheme();
-        $default_color = getThemeData($theme, "default_color");
-        $heading_color = getThemeData($theme, "heading_color");
-        $accent_color = getThemeData($theme, "accent_color");
-        $surface_color = getThemeData($theme, "surface_color");
-        $contrast_color = getThemeData($theme, "contrast_color");
-        $background_color = getThemeData($theme, "background_color");
-        
+        // Get theme colors (shared retrieval — see getSearchResultThemeColors)
+        extract(getSearchResultThemeColors());
+
         ob_start();
         ?>
         <style>
@@ -3641,15 +3661,9 @@ if (!function_exists('renderFilterSearchResults')) {
             default => '&#128193;' // 📁
         };
 
-        // Get theme colors
-        $theme = getCurrentTheme();
-        $default_color = getThemeData($theme, "default_color");
-        $heading_color = getThemeData($theme, "heading_color");
-        $accent_color = getThemeData($theme, "accent_color");
-        $surface_color = getThemeData($theme, "surface_color");
-        $contrast_color = getThemeData($theme, "contrast_color");
-        $background_color = getThemeData($theme, "background_color");
-        
+        // Get theme colors (shared retrieval — see getSearchResultThemeColors)
+        extract(getSearchResultThemeColors());
+
         ob_start();
         ?>
         <style>
@@ -4056,15 +4070,9 @@ if (!function_exists('renderFilterSearchResults')) {
 if (!function_exists('renderBlogsGrid')) {
     function renderBlogsGrid($blogs, $emptyMessage = 'No blog posts available at the moment.') 
     {
-        // Get theme colors
-        $theme = getCurrentTheme();
-        $default_color = getThemeData($theme, "default_color");
-        $heading_color = getThemeData($theme, "heading_color");
-        $accent_color = getThemeData($theme, "accent_color");
-        $surface_color = getThemeData($theme, "surface_color");
-        $contrast_color = getThemeData($theme, "contrast_color");
-        $background_color = getThemeData($theme, "background_color");
-        
+        // Get theme colors (shared retrieval — see getSearchResultThemeColors)
+        extract(getSearchResultThemeColors());
+
         ob_start();
         ?>
         <style>
@@ -4276,15 +4284,9 @@ if (!function_exists('renderBlogsGrid')) {
 if (!function_exists('renderBlogContent')) {
     function renderBlogContent($blog_data) 
     {
-        // Get theme colors
-        $theme = getCurrentTheme();
-        $default_color = getThemeData($theme, "default_color");
-        $heading_color = getThemeData($theme, "heading_color");
-        $accent_color = getThemeData($theme, "accent_color");
-        $surface_color = getThemeData($theme, "surface_color");
-        $contrast_color = getThemeData($theme, "contrast_color");
-        $background_color = getThemeData($theme, "background_color");
-        
+        // Get theme colors (shared retrieval — see getSearchResultThemeColors)
+        extract(getSearchResultThemeColors());
+
         ob_start();
         ?>
         <style>
@@ -4440,15 +4442,9 @@ if (!function_exists('renderBlogContent')) {
 if (!function_exists('renderBlogSidebar')) {
     function renderBlogSidebar($categories = [], $blogs = [], $blog_data = []) 
     {
-        // Get theme colors
-        $theme = getCurrentTheme();
-        $default_color = getThemeData($theme, "default_color");
-        $heading_color = getThemeData($theme, "heading_color");
-        $accent_color = getThemeData($theme, "accent_color");
-        $surface_color = getThemeData($theme, "surface_color");
-        $contrast_color = getThemeData($theme, "contrast_color");
-        $background_color = getThemeData($theme, "background_color");
-        
+        // Get theme colors (shared retrieval — see getSearchResultThemeColors)
+        extract(getSearchResultThemeColors());
+
         ob_start();
         ?>
         <style>
