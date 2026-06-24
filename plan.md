@@ -99,12 +99,10 @@
   - Move each domain's methods over **verbatim**; `AdminController` keeps only `index()` (dashboard) as a thin shell.
   - Update **only the controller name** in each `app/Config/Routes.php` line — **URL paths unchanged** (e.g. `admin/users` → `Admin\UsersController::users`).
   - Commit: `refactor: extract AdminController domains into focused controllers (Extract Class, #1)`
-- [ ] **#5 add/update user → Introduce Parameter Object / Extract Method** *(do right after #1 — these methods now live in the extracted `UsersController`)*
+- [x] **#5 add/update user → Introduce Parameter Object** ✅ *(lives in the extracted `UsersController`)*. New `app/DataObjects/UserData.php` (`fromRequest()` + `toCreateArray()`/`toUpdateArray()`) centralises the duplicated user/social-link field mapping + default rules; `addUser`/`updateUser` now build their arrays from it. Original key order preserved verbatim (so DB writes + activity-log JSON unchanged) — locked by `tests/DataObjects/UserDataTest.php` (3 tests/22 assertions green); golden master still passes; user routes 302 (no 500s).
   - Extract the repeated user/social-link array into a builder/DTO.
   - Commit: `refactor: extract user data builder to remove data clump in UsersController (#5)`
-- [ ] **#4 `logActivity()` → Introduce Parameter Object** *(independent — in `cms_helper.php`)*
-  - Create `ActivityLogData` DTO/value object; refactor signature; update call sites (now in the extracted controllers).
-  - Commit: `refactor: introduce ActivityLogData parameter object for logActivity (#4)`
+- [x] **#4 Long Parameter List → Introduce Parameter Object** ✅ **(target changed from `logActivity` to `GoogleAuthController::createGoogleUser`)**. `logActivity()` (8 params) has **169 call sites across 28 files** → too cross-cutting/risky to re-signature. Refactored the self-contained `createGoogleUser($email,$firstName,$lastName,$googleId,$profilePicture)` (5 params, 1 private call site, clear data clump) instead. New `app/DataObjects/GoogleUserData.php` (+ `fromGoogleUser()` factory encapsulating the extraction + name-split); method now takes 1 object param (verified via reflection 5→1). Locked by `tests/DataObjects/GoogleUserDataTest.php` (3 tests); `php -l` clean; PHPMD param threshold lowered 6→5 so it's auto-detected; `CODE_SMELLS_REPORT.md` scope note added.
 - [ ] **#3 render functions → Extract Method** *(independent — in `cms_helper.php`)*
   - Extract shared result-rendering into one helper; both functions delegate to it.
   - Commit: `refactor: extract shared search-result rendering to remove duplication (#3)`
