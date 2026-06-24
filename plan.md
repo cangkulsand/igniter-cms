@@ -103,9 +103,7 @@
   - Extract the repeated user/social-link array into a builder/DTO.
   - Commit: `refactor: extract user data builder to remove data clump in UsersController (#5)`
 - [x] **#4 Long Parameter List → Introduce Parameter Object** ✅ **(target changed from `logActivity` to `GoogleAuthController::createGoogleUser`)**. `logActivity()` (8 params) has **169 call sites across 28 files** → too cross-cutting/risky to re-signature. Refactored the self-contained `createGoogleUser($email,$firstName,$lastName,$googleId,$profilePicture)` (5 params, 1 private call site, clear data clump) instead. New `app/DataObjects/GoogleUserData.php` (+ `fromGoogleUser()` factory encapsulating the extraction + name-split); method now takes 1 object param (verified via reflection 5→1). Locked by `tests/DataObjects/GoogleUserDataTest.php` (3 tests); `php -l` clean; PHPMD param threshold lowered 6→5 so it's auto-detected; `CODE_SMELLS_REPORT.md` scope note added.
-- [ ] **#3 render functions → Extract Method** *(independent — in `cms_helper.php`)*
-  - Extract shared result-rendering into one helper; both functions delegate to it.
-  - Commit: `refactor: extract shared search-result rendering to remove duplication (#3)`
+- [x] **#3 render functions → Extract Method / Consolidate Duplicate Code** ✅ *(in `cms_helper.php`)*. Extracted the identical 7-line theme-colour retrieval block — duplicated **verbatim across 5 render functions** (`renderSearchResults`, `renderFilterSearchResults`, `renderBlogsGrid`, +2), exactly the clone pairs jscpd flagged — into a single `getSearchResultThemeColors()` helper; each consumer now calls `extract(getSearchResultThemeColors())`. Output proven **byte-for-byte identical** by the golden master (`tests/Helpers/RenderSearchResultsTest.php`, 3 tests green). The two render functions' remaining differences are intentional (CSS-class prefix `sr-`/`fr-` + header variant), so only the safely-shared logic was consolidated. *(Optional deeper extraction of the prefix-parameterised item markup available if wanted.)*
 
 ### Phase 3 — Prove behaviour preserved
 - [ ] **PHPUnit golden-master re-run** → HTML output **byte-for-byte identical** to baseline. ✅
