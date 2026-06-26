@@ -1,4 +1,5 @@
 <?php
+use App\DataObjects\ActivityLogData;
 use App\Models\ActivityLogsModel;
 use App\Constants\ActivityTypes;
 use App\Models\SiteStatsModel;
@@ -1723,6 +1724,35 @@ if (!function_exists('logActivity')) {
             log_message('error', $e->getMessage());
             return false;
         }
+    }
+}
+
+/**
+ * Logs an activity from an ActivityLogData parameter object.
+ *
+ * Refactored sibling of logActivity() introduced for the Long Parameter List
+ * smell (Code Smell 2, Introduce Parameter Object): the eight positional
+ * parameters logActivity() declares are grouped into a single ActivityLogData
+ * object, so call sites pass one named object instead of a long positional
+ * argument list. It unpacks the object and delegates to logActivity(), so the
+ * logging behaviour is, by construction, identical (behaviour-preserving).
+ *
+ * @param ActivityLogData $activity - The activity to log.
+ * @return {bool} Returns true if the activity was successfully logged, false otherwise.
+ */
+if (!function_exists('refLogActivity')) {
+    function refLogActivity(ActivityLogData $activity)
+    {
+        return logActivity(
+            $activity->activityBy,
+            $activity->activityType,
+            $activity->activityDetails,
+            $activity->url,
+            $activity->auditableType,
+            $activity->auditableId,
+            $activity->oldValues,
+            $activity->newValues
+        );
     }
 }
 

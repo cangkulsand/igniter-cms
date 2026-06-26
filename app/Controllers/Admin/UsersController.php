@@ -4,6 +4,7 @@ namespace App\Controllers\Admin;
 
 use App\Constants\ActivityTypes;
 use App\Controllers\BaseController;
+use App\DataObjects\ActivityLogData;
 use App\DataObjects\UserData;
 use App\Models\UsersModel;
 
@@ -75,8 +76,17 @@ class UsersController extends BaseController
             $createSuccessMsg = str_replace('[Record]', 'User', lang('App.create_success_msg'));
             session()->setFlashdata('successAlert', $createSuccessMsg);
 
-            //log activity
-            logActivity($loggedInUserId, ActivityTypes::USER_CREATION, 'User created with id: ' . $insertedId, $actionUrl, get_class($usersModel), $insertedId, json_encode($previousData), json_encode($cleanedUserData));
+            //log activity (Introduce Parameter Object, Code Smell 2: named fields instead of 8 positional args)
+            refLogActivity(new ActivityLogData(
+                activityBy: $loggedInUserId,
+                activityType: ActivityTypes::USER_CREATION,
+                activityDetails: 'User created with id: ' . $insertedId,
+                url: $actionUrl,
+                auditableType: get_class($usersModel),
+                auditableId: $insertedId,
+                oldValues: json_encode($previousData),
+                newValues: json_encode($cleanedUserData),
+            ));
 
             return redirect()->to('/account/admin/users');
         } else {
@@ -84,8 +94,16 @@ class UsersController extends BaseController
             $errorMsg = lang('App.error_msg');
             session()->setFlashdata('errorAlert', $errorMsg);
 
-            //log activity
-            logActivity($loggedInUserId, ActivityTypes::FAILED_USER_CREATION, 'Failed to create user with email: ' . $this->request->getPost('email'), $actionUrl, get_class($usersModel), null, json_encode($cleanedUserData));
+            //log activity (Introduce Parameter Object, Code Smell 2: named fields instead of 8 positional args)
+            refLogActivity(new ActivityLogData(
+                activityBy: $loggedInUserId,
+                activityType: ActivityTypes::FAILED_USER_CREATION,
+                activityDetails: 'Failed to create user with email: ' . $this->request->getPost('email'),
+                url: $actionUrl,
+                auditableType: get_class($usersModel),
+                auditableId: null,
+                oldValues: json_encode($cleanedUserData),
+            ));
 
             return view('back-end/admin/users/new-user');
         }
@@ -149,8 +167,17 @@ class UsersController extends BaseController
             $createSuccessMsg = str_replace('[Record]', 'User', lang('App.edit_success_msg'));
             session()->setFlashdata('successAlert', $createSuccessMsg);
 
-            //log activity
-            logActivity($loggedInUserId, ActivityTypes::USER_UPDATE, 'User updated with id: ' . $userId, $actionUrl, get_class($usersModel), $userId, json_encode($cleanedPreviousData), json_encode($data));
+            //log activity (Introduce Parameter Object, Code Smell 2: named fields instead of 8 positional args)
+            refLogActivity(new ActivityLogData(
+                activityBy: $loggedInUserId,
+                activityType: ActivityTypes::USER_UPDATE,
+                activityDetails: 'User updated with id: ' . $userId,
+                url: $actionUrl,
+                auditableType: get_class($usersModel),
+                auditableId: $userId,
+                oldValues: json_encode($cleanedPreviousData),
+                newValues: json_encode($data),
+            ));
 
             return redirect()->to('/account/admin/users');
         }
