@@ -21,6 +21,23 @@ All findings below were verified against the actual source files and line number
 
 ---
 
+## Refactoring scope note — Long Parameter List (#4)
+
+`logActivity()` (8 params) is the most visible Long Parameter List, but it is
+called from **169 sites across 28 files**, so changing its signature is a
+cross-cutting change with wide behavioural risk. The **refactoring** for this
+smell is therefore applied to a second, self-contained instance:
+`GoogleAuthController::createGoogleUser($email, $firstName, $lastName, $googleId,
+$profilePicture)` — **5 parameters** that are all attributes of one Google user
+(a textbook data clump) with a **single, private call site**. This makes the
+Introduce Parameter Object refactoring fully localized and provably
+behaviour-preserving (see `app/DataObjects/GoogleUserData.php` and
+`tests/DataObjects/GoogleUserDataTest.php`). The PHPMD `ExcessiveParameterList`
+threshold is set to 5 so this instance is flagged automatically. `logActivity()`
+is left unchanged and documented as a larger, deferred instance.
+
+---
+
 ## Supporting Observations
 
 - **Shotgun Surgery / repeated boilerplate:** The pattern *validate → build array → `createX()`/`update()` → `setFlashdata()` → `logActivity()` → redirect* is copy-pasted across nearly every `add*/update*` pair in `AdminController.php` (`addUser`/`updateUser`, `addApiKey`/`updateApiKey`, `addConfiguration`/`updateConfiguration`, `addCode`, `addBlockedIP`, `addWhitelistedIP`, `generateDbBackup`). A change to the logging or flash-message convention would force edits in ~15 places.

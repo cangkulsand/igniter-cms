@@ -6,8 +6,9 @@
                              http://pmd.sf.net/ruleset_xml_schema.xsd">
     <description>
         Ruleset for the UTM Part B code-smell analysis. Uses the standard PHPMD
-        rulesets but lowers ExcessiveParameterList's threshold so the 8-parameter
-        logActivity() (smell #4) is detected (PHPMD default minimum is 10).
+        rulesets but lowers ExcessiveParameterList's threshold so the targeted
+        Long Parameter List (smell #4 — GoogleAuthController::createGoogleUser(),
+        5 parameters) is detected. PHPMD's default minimum is 10.
     </description>
 
     <!-- Code Size: keep all rules except the default-threshold ExcessiveParameterList -->
@@ -15,11 +16,11 @@
         <exclude name="ExcessiveParameterList"/>
     </rule>
 
-    <!-- Re-add ExcessiveParameterList with a lower threshold (catches >= 6 params) -->
+    <!-- Re-add ExcessiveParameterList with a lower threshold (catches >= 5 params) -->
     <rule ref="rulesets/codesize.xml/ExcessiveParameterList">
         <priority>1</priority>
         <properties>
-            <property name="minimum" value="6"/>
+            <property name="minimum" value="5"/>
         </properties>
     </rule>
 

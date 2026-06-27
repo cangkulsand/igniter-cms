@@ -1,0 +1,384 @@
+        <style>
+        .fr-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            font-family: system-ui, -apple-system, sans-serif;
+            color: #222222;
+        }
+        .fr-header {
+            background: #222222;
+            color: white;
+            border-radius: 12px;
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+        }
+        .fr-type-indicator {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            padding: 0.75rem 1.25rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        .fr-title {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin: 0 0 0.5rem 0;
+            color: white;
+        }
+        .fr-subtitle {
+            font-size: 1.125rem;
+            margin: 0;
+            opacity: 0.9;
+            color: white;
+        }
+        .fr-highlight {
+            color: #FFD700;
+            font-weight: 600;
+        }
+        .fr-section {
+            margin-bottom: 3rem;
+        }
+        .fr-section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #111111;
+            margin: 0 0 1.5rem 0;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #22222230;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .fr-count {
+            background: #e91e63;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-left: auto;
+        }
+        .fr-list {
+            display: grid;
+            gap: 1rem;
+        }
+        .fr-list-item {
+            display: block;
+            background: #ffffff;
+            border: 1px solid #22222220;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s ease;
+        }
+        .fr-list-item:hover {
+            border-color: #222222;
+            background: #f5f5f5;
+            transform: translateX(4px);
+        }
+        .fr-item-header {
+            display: flex;
+            justify-content: between;
+            align-items: start;
+            margin-bottom: 0.75rem;
+            gap: 1rem;
+        }
+        .fr-item-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #111111;
+            margin: 0;
+            flex: 1;
+        }
+        .fr-badge {
+            background: #222222;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .fr-item-desc {
+            color: #222222;
+            margin: 0 0 0.5rem 0;
+            line-height: 1.5;
+        }
+        .fr-item-url {
+            color: #222222;
+            font-size: 0.875rem;
+            margin: 0;
+        }
+        .fr-blog-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        .fr-blog-card {
+            background: #ffffff;
+            border: 1px solid #22222220;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .fr-blog-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        .fr-image-wrapper {
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+            background: #22222210;
+            position: relative;
+        }
+        .fr-blog-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+        .fr-blog-card:hover .fr-blog-image {
+            transform: scale(1.05);
+        }
+        .fr-blog-content {
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .fr-blog-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .fr-blog-category {
+            background: #222222;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+        .fr-blog-date {
+            color: #222222;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .fr-blog-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #111111;
+            margin: 0 0 0.75rem 0;
+            line-height: 1.4;
+        }
+        .fr-blog-excerpt {
+            color: #222222;
+            margin: 0 0 1.25rem 0;
+            line-height: 1.5;
+            flex: 1;
+        }
+        .fr-button {
+            display: inline-block;
+            background: #222222;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            align-self: flex-start;
+        }
+        .fr-button:hover {
+            background: #e91e63;
+            transform: translateY(-1px);
+        }
+        .fr-button-outline {
+            background: transparent;
+            border: 2px solid #222222;
+            color: #222222;
+        }
+        .fr-button-outline:hover {
+            background: #222222;
+            color: white;
+        }
+        .fr-form {
+            width: 100%;
+        }
+        .fr-input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #22222230;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.3s ease;
+        }
+        .fr-input:focus {
+            outline: none;
+            border-color: #222222;
+        }
+        .fr-icon {
+            font-size: 1.2em;
+            line-height: 1;
+        }
+        .fr-icon-large {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        .fr-center {
+            text-align: center;
+        }
+        .fr-card {
+            background: #ffffff;
+            border: 1px solid #22222220;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+        .fr-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        
+        /* Responsive adjustment for mobile */
+        @media (max-width: 768px) {
+            .fr-image-wrapper {
+                height: 180px;
+            }
+        }
+        </style>
+
+        <div class="fr-container">
+                            <!-- Search Header -->
+                <div class="fr-header">
+                    <div class="fr-type-indicator">
+                        <span class="fr-icon">&#128193;</span>
+                        <span>All Filter</span>
+                    </div>
+                    <h1 class="fr-title">All: "<span class="fr-highlight">php</span>"</h1>
+                    <p class="fr-subtitle">4 result(s) found in all</p>
+                </div>
+
+                <!-- Pages Results -->
+                                    <div class="fr-section">
+                        <h2 class="fr-section-title">
+                            <span class="fr-icon"><i class="ri-file-line"></i></span>
+                            Pages
+                            <span class="fr-count">2 result(s) found</span>
+                        </h2>
+                        <div class="fr-list">
+                                                            <a href="http://localhost/igniter-cms/about-us" class="fr-list-item">
+                                    <div class="fr-item-header">
+                                        <h3 class="fr-item-title">About Us</h3>
+                                        <span class="fr-badge">Page</span>
+                                    </div>
+                                    <p class="fr-item-desc">
+                                        Learn about our company and our mission.                                    </p>
+                                    <p class="fr-item-url">http://localhost/igniter-cms/about-us</p>
+                                </a>
+                                                            <a href="http://localhost/igniter-cms/contact" class="fr-list-item">
+                                    <div class="fr-item-header">
+                                        <h3 class="fr-item-title">Contact</h3>
+                                        <span class="fr-badge">Page</span>
+                                    </div>
+                                    <p class="fr-item-desc">
+                                        Learn more about this page.                                    </p>
+                                    <p class="fr-item-url">http://localhost/igniter-cms/contact</p>
+                                </a>
+                                                    </div>
+                    </div>
+                
+                <!-- Blogs Results -->
+                                    <div class="fr-section">
+                        <h2 class="fr-section-title">
+                            <span class="fr-icon"><i class="ri-newspaper-line"></i></span>
+                            Blog Posts
+                            <span class="fr-count">2 result(s) found</span>
+                        </h2>
+                        <div class="fr-blog-grid">
+                                                            <div class="fr-blog-card">
+                                    <div class="fr-image-wrapper">
+                                        <a href="http://localhost/igniter-cms/blog/intro-to-php">
+                                            <img src="http://localhost/igniter-cms/uploads/php.jpg"
+                                                 class="fr-blog-image"
+                                                 alt="Intro to PHP"
+                                                 loading="lazy"
+                                                 onerror="this.src='public/back-end/assets/img/default_image_placeholder.png'">
+                                        </a>
+                                    </div>
+                                    <div class="fr-blog-content">
+                                        <div class="fr-blog-meta">
+                                            <span class="fr-blog-category">
+                                                Uncategorized                                            </span>
+                                            <span class="fr-blog-date">
+                                                <span class="fr-icon"><i class="ri-calendar-line"></i></span>
+                                                Jan 15, 2024                                            </span>
+                                        </div>
+                                        <h3 class="fr-blog-title">Intro to PHP</h3>
+                                        <p class="fr-blog-excerpt">
+                                            A beginner friendly introduction to PHP programming.                                        </p>
+                                        <a href="http://localhost/igniter-cms/blog/intro-to-php" class="fr-button fr-button-outline">Read More</a>
+                                    </div>
+                                </div>
+                                                            <div class="fr-blog-card">
+                                    <div class="fr-image-wrapper">
+                                        <a href="http://localhost/igniter-cms/blog/php-8-features">
+                                            <img src="http://localhost/igniter-cms/"
+                                                 class="fr-blog-image"
+                                                 alt="PHP 8 Features"
+                                                 loading="lazy"
+                                                 onerror="this.src='public/back-end/assets/img/default_image_placeholder.png'">
+                                        </a>
+                                    </div>
+                                    <div class="fr-blog-content">
+                                        <div class="fr-blog-meta">
+                                            <span class="fr-blog-category">
+                                                Uncategorized                                            </span>
+                                            <span class="fr-blog-date">
+                                                <span class="fr-icon"><i class="ri-calendar-line"></i></span>
+                                                Feb 20, 2024                                            </span>
+                                        </div>
+                                        <h3 class="fr-blog-title">PHP 8 Features</h3>
+                                        <p class="fr-blog-excerpt">
+                                            A deep dive into the new features shipped with PHP 8.                                        </p>
+                                        <a href="http://localhost/igniter-cms/blog/php-8-features" class="fr-button fr-button-outline">Read More</a>
+                                    </div>
+                                </div>
+                                                    </div>
+                    </div>
+                
+                <!-- Final Feedback Section -->
+                <div class="fr-section">
+                    <div class="fr-card fr-center">
+                        <span class="fr-icon fr-icon-large"><i class="ri-filter-line"></i></span>
+                        <h2 style="font-size: 1.75rem; margin: 0 0 1rem 0; color: #111111;">Need Different Results?</h2>
+                        <p style="margin: 0 0 2rem 0; color: #222222;">Try searching with different criteria or browse all content.</p>
+                        <form action="http://localhost/igniter-cms/search" method="get" class="fr-form">
+                            <input type="text" name="q" class="fr-input" placeholder="Search again..." value="php">
+                            <button type="submit" class="fr-button">Search</button>
+                        </form>
+                    </div>
+                </div>
+
+                    </div>
+        

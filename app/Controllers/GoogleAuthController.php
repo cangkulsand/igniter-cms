@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Controllers\BaseController;
+use App\DataObjects\GoogleUserData;
 use App\Models\UsersModel;
 use App\Constants\ActivityTypes;
 use Google\Client as GoogleClient;
@@ -85,29 +86,19 @@ class GoogleAuthController extends BaseController
 
     private function processGoogleUser($googleUser)
     {
-        $email = $googleUser->getEmail();
-        $googleId = $googleUser->getId();
-        $firstName = $googleUser->getGivenName();
-        $lastName = $googleUser->getFamilyName();
-        $fullName = $googleUser->getName();
-        $profilePicture = $googleUser->getPicture();
-
-        // Split full name if first/last name not provided
-        if (empty($firstName) && empty($lastName) && !empty($fullName)) {
-            $nameParts = explode(' ', $fullName, 2);
-            $firstName = $nameParts[0];
-            $lastName = $nameParts[1] ?? '';
-        }
+        // Group the Google profile fields into a single parameter object
+        // (extraction + name fallback now live in the object's factory).
+        $googleUserData = GoogleUserData::fromGoogleUser($googleUser);
 
         // Check if user exists by email
-        $existingUser = $this->usersModel->where('email', $email)->first();
+        $existingUser = $this->usersModel->where('email', $googleUserData->email)->first();
 
         if ($existingUser) {
             // User exists - log them in
             return $this->loginExistingUser($existingUser);
         } else {
             // User doesn't exist - create new account
-            return $this->createGoogleUser($email, $firstName, $lastName, $googleId, $profilePicture);
+            return $this->createGoogleUser($googleUserData);
         }
     }
 
@@ -144,8 +135,14 @@ class GoogleAuthController extends BaseController
         return redirect()->to('/account/dashboard');
     }
 
-    private function createGoogleUser($email, $firstName, $lastName, $googleId, $profilePicture)
+    private function createGoogleUser(GoogleUserData $googleUserData)
     {
+        // Unpack the parameter object into the locals the method already uses.
+        $email = $googleUserData->email;
+        $firstName = $googleUserData->firstName;
+        $lastName = $googleUserData->lastName;
+        $profilePicture = $googleUserData->profilePicture;
+
         // Generate username from email
         $username = $this->generateUniqueUsername($email);
         
