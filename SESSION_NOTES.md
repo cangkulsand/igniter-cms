@@ -1,6 +1,6 @@
 # Session Notes — UTM Part B (Code Smells & Refactoring)
 
-> Handoff document so work can continue in a new session. Last updated: 2026-06-22.
+> Handoff document so work can continue in a new session. Last updated: 2026-06-26.
 > Companion to `plan.md` (the master plan with BEFORE/AFTER phases). Read both.
 
 ---
@@ -82,19 +82,23 @@ From CI run, artifacts in **`analysis-reports-job1/`** (the correct tuned run; `
 
 - **Phase 0 (setup):** ✅ complete.
 - **Phase 1 (baseline "before"):** automated detection ✅. **PHPUnit golden-master ✅** — `tests/Helpers/RenderSearchResultsTest.php` (+ `tests/_snapshots/*.html`), seeds theme into in-memory SQLite, 3 tests green, byte-for-byte on re-run; `tests/**` added to `sonar.cpd.exclusions`. **SonarCloud scan #1 screenshots ✅** (Issues + Measures captured). Remaining: run `php spark benchmark:smells` locally for B6 "before" (`.env` + DB confirmed working — app live at `http://igniter-cms.test`); **Katalon baseline — OPTIONAL/SKIPPED** (rubric B5 only needs re-run + after-screenshot, satisfied by golden master + manual screenshots). Guide kept at `katalon/KATALON_GUIDE.md` if wanted later.
-- **Phase 2 (refactor):** 🟢 #1 DONE (Extract Class, commit `005f61a` on branch `refactor/extract-admincontroller`) — 7 controllers in `app/Controllers/Admin/`, `AdminController` now `index()` only, 27 routes repointed (URLs identical). 🟢 #5 DONE (Introduce Parameter Object) — `app/DataObjects/UserData.php` removes the add/update user data clump; locked by `tests/DataObjects/UserDataTest.php`. 🟢 #4 DONE (Introduce Parameter Object) — **target switched from `logActivity` (169 call sites, too risky) to `GoogleAuthController::createGoogleUser` (5 params, 1 call site)**; new `app/DataObjects/GoogleUserData.php`, locked by `tests/DataObjects/GoogleUserDataTest.php`; PHPMD param min 6→5; report scope note added. Google auth feature is flag-disabled in this install (route 404), so #4's behaviour proof is the unit test, not a live screenshot. 🟢 #3 DONE (Extract Method / Consolidate Duplicate Code) — `getSearchResultThemeColors()` consolidates the theme-colour block duplicated across 5 render functions; golden master byte-identical green. **All 4 refactorings complete.** Optional: deeper prefix-parameterised item-markup extraction of the two render fns.
-- **Phase 3 (prove behaviour):** ⬜. **Phase 4 (after metrics + /refactored-code):** ⬜.
+- **Phase 2 (refactor):** 🟢 #1 DONE (Extract Class, commit `005f61a` on branch `refactor/extract-admincontroller`) — 7 controllers in `app/Controllers/Admin/`, `AdminController` now `index()` only, 27 routes repointed (URLs identical). 🟢 #5 DONE (Introduce Parameter Object) — `app/DataObjects/UserData.php` removes the add/update user data clump; locked by `tests/DataObjects/UserDataTest.php`. 🟢 #4 DONE (Introduce Parameter Object) — **now refactors the actual detected smell `logActivity` (8 params), which is "Code Smell 2" in the report.** Approach: keep original `logActivity()` UNTOUCHED (the documented smell + B5 "Before"); add `refLogActivity(ActivityLogData)` **sibling** in `cms_helper.php` that unpacks the object and delegates to `logActivity()` (behaviour-preserving by construction, so the ~170 call sites stay safe). New `app/DataObjects/ActivityLogData.php` (8 fields, same defaults as the signature, `auditableId` nullable), locked by `tests/DataObjects/ActivityLogDataTest.php` (field-carrying + defaults). **3 `UsersController` call sites converted** (USER_CREATION, USER_UPDATE, FAILED_USER_CREATION) as proof of concept. Commit `10554f6`. Full suite green (16 tests, 52 assertions). The earlier `GoogleAuthController::createGoogleUser` → `GoogleUserData` work (commit history) remains as a *supporting* second example but is NOT what the report's Code Smell 2 section shows. PHPMD param min was lowered 6→5 earlier (detection-config change, footnote in report). 🟢 #3 DONE (Extract Method / Consolidate Duplicate Code) — `getSearchResultThemeColors()` consolidates the theme-colour block duplicated across 5 render functions; golden master byte-identical green. **All 4 refactorings complete.** Optional: deeper prefix-parameterised item-markup extraction of the two render fns.
+- **Phase 3 (prove behaviour):** 🟢 in progress — full PHPUnit suite green on refactored branch (16 tests / 52 assertions incl. golden master + all DTO tests).
+- **Phase 4 (after metrics + /refactored-code):** 🟢 in progress — "after" PHPMD + jscpd captured (`analysis-reports-after/`). **#1 God Class eliminated**: `AdminController` gone from PHPMD entirely (was LOC 1254 / 41 methods / 40 public / cx 87 / coupling 15 → none). **#3 Duplicate Code**: jscpd 6.54%→6.37% (2,735→2,681 dup lines, 167→163 clones). Still TODO: SonarCloud "after" LOC/complexity numbers, local `php spark benchmark:smells` "after" run, populate `/refactored-code`.
 
 ---
 
 ## 8. NEXT STEPS (start here next session)
 
-1. Capture SonarCloud + jscpd screenshots into the report (B3) — see screenshot map in chat / `plan.md`.
-2. Fill **B1 baseline metrics** (LOC + cyclomatic complexity; dup = 6.54%).
-3. Set up local `.env` + DB (`guide.md`), then run `php spark benchmark:smells --iterations 2000` → record B6 "before".
-4. Write **PHPUnit golden-master** for `renderSearchResults()`; add `tests/**` to `sonar.cpd.exclusions` (golden-master embeds HTML).
-5. Replace committed stale `analysis-reports/` with `analysis-reports-job1/`.
-6. Begin **Phase 2** refactoring (#1 Extract Class first).
+All 4 refactorings are DONE, committed, and pushed (branch `refactor/extract-admincontroller`; latest `10554f6`). Remaining is reporting + after-metrics:
+
+1. **Report doc** lives in `answer/Draft Part B.docx` (latest master, often open in Word → write generated edits to `answer/Draft Part B (updated).docx`, backup first). B5 "Code Smell 2 → After Refactor" is FILLED in the `(updated)` copy (ActivityLogData + refLogActivity + before/after call site). **Reconcile `(updated)` → master once Word is closed.**
+2. **Capture "Before" screenshots/code** still pending: Code Smell 2 "Before Refactor" still has a `Figure X:` placeholder for the original `logActivity()` (8-param) source.
+3. Fill **B1 baseline metrics** (LOC + cyclomatic complexity; dup = 6.54%) from SonarCloud "before".
+4. Capture remaining SonarCloud + jscpd screenshots into B3.
+5. Run `php spark benchmark:smells --iterations 2000` locally for B6 "before" AND "after".
+6. Get SonarCloud "after" LOC/complexity numbers (branch `refactor/extract-admincontroller` in the branch dropdown).
+7. Populate `/refactored-code` directory; replace stale `analysis-reports/` with `analysis-reports-job1/` (before) and add `analysis-reports-after/` (after).
 
 ## 9. Open confirmations
 - Instructor accepts **GitHub + Actions** vs literal "Jenkins" repo link (brief says Jenkins).
